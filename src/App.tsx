@@ -122,7 +122,9 @@ export default function App() {
         onBack={() => navigateTo('/')}
         onEpisodeChange={(newSeason, newEpisode) => {
           const endpoint =
-            route.playerMode === 'bingr'
+            route.playerMode === 'omni'
+              ? 'goat'
+              : route.playerMode === 'bingr'
               ? 'bingr'
               : route.playerMode === 'overpower'
               ? 'overpower'
@@ -161,7 +163,9 @@ export default function App() {
           return;
         }
         const endpoint =
-          playerMode === 'bingr'
+          playerMode === 'omni'
+            ? 'goat'
+            : playerMode === 'bingr'
             ? 'bingr'
             : playerMode === 'overpower'
             ? 'overpower'

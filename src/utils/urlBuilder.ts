@@ -1,4 +1,4 @@
-export type PlayerMode = 'custom' | 'builtin' | 'nxsha' | 'anime' | 'overpower' | 'bingr';
+export type PlayerMode = 'custom' | 'builtin' | 'nxsha' | 'anime' | 'overpower' | 'bingr' | 'omni';
 export type MediaType = 'movie' | 'tv';
 
 export interface PlayerUrlOptions {
@@ -175,7 +175,9 @@ export function buildPlayerUrl(options: PlayerUrlOptions): string {
   }
 
   const endpoint =
-    options.playerMode === 'bingr'
+    options.playerMode === 'omni'
+      ? 'goat'
+      : options.playerMode === 'bingr'
       ? 'bingr'
       : options.playerMode === 'overpower'
       ? 'overpower'
@@ -559,6 +561,51 @@ export const NXSHA_SERVERS = [
   { index: 41, id: 'bingr', label: 'Bingr Core (Ad-Free Master)' },
 ] as const;
 
+export interface OmniServerDefinition {
+  index: number;
+  id: string;
+  upstreamId: string;
+  resolveEngine: 'stream' | 'nxsha';
+  engineTag: 'BINGR' | 'OVER POWER' | 'ZXCSTREAM' | 'NXSHA';
+  label: string;
+}
+
+const RAW_OMNI_SERVERS: Array<Omit<OmniServerDefinition, 'index'>> = [
+  ...BINGR_SERVERS.map((s) => ({
+    id: s.id,
+    upstreamId: s.id,
+    resolveEngine: 'stream' as const,
+    engineTag: 'BINGR' as const,
+    label: `Bingr · ${s.label}`,
+  })),
+  ...OVERPOWER_SERVERS.filter((s) => s.id.startsWith('source-')).map((s) => ({
+    id: s.id,
+    upstreamId: s.id,
+    resolveEngine: 'stream' as const,
+    engineTag: 'OVER POWER' as const,
+    label: `OP · ${s.label}`,
+  })),
+  ...PLAYER_SERVERS.map((s) => ({
+    id: `zxc-${s.id}`,
+    upstreamId: s.id,
+    resolveEngine: 'stream' as const,
+    engineTag: 'ZXCSTREAM' as const,
+    label: `ZXC · ${s.label}`,
+  })),
+  ...NXSHA_SERVERS.map((s) => ({
+    id: `nx-${s.id}`,
+    upstreamId: s.id,
+    resolveEngine: 'nxsha' as const,
+    engineTag: 'NXSHA' as const,
+    label: `NX · ${s.label}`,
+  })),
+];
+
+export const OMNI_SERVERS: ReadonlyArray<OmniServerDefinition> = RAW_OMNI_SERVERS.map((srv, idx) => ({
+  ...srv,
+  index: idx,
+}));
+
 export const PLAYER_HINTS = [
   'You can customize the subtitle size, color, and position in the settings.',
   'If the current server is slow or buffering, try switching to another server in the top-right corner.',
@@ -610,7 +657,7 @@ export function parsePlayerQueryParams(search: string): ParsedPlayerQuery {
   let server: number | undefined;
   if (rawServer !== null && rawServer.trim() !== '') {
     const parsed = Number.parseInt(rawServer, 10);
-    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 50) {
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) {
       server = parsed;
     }
   }
@@ -988,9 +1035,18 @@ export function parseAppRoute(pathname: string): AppRoute {
     }
   }
 
-  // Standard Embed / Custom / NXSHA / OVER POWER / BINGR Player Routes: /embed/movie/:id or /embed/tv/:id/:s/:e
+  // Standard Embed / Custom / NXSHA / OVER POWER / BINGR / GOAT (All-In-One Omni) Player Routes:
+  // /embed/movie/:id, /goat/movie/:id, /omni/movie/:id, /all/movie/:id, /allinone/movie/:id, etc.
   if (
-    (first === 'player' || first === 'embed' || first === 'nxsha' || first === 'overpower' || first === 'bingr') &&
+    (first === 'player' ||
+      first === 'embed' ||
+      first === 'nxsha' ||
+      first === 'overpower' ||
+      first === 'bingr' ||
+      first === 'goat' ||
+      first === 'omni' ||
+      first === 'all' ||
+      first === 'allinone') &&
     (second === 'movie' || second === 'tv') &&
     third
   ) {
@@ -999,7 +1055,9 @@ export function parseAppRoute(pathname: string): AppRoute {
     return {
       page: 'player',
       playerMode:
-        first === 'bingr'
+        first === 'goat' || first === 'omni' || first === 'all' || first === 'allinone'
+          ? 'omni'
+          : first === 'bingr'
           ? 'bingr'
           : first === 'overpower'
           ? 'overpower'
@@ -2216,6 +2274,78 @@ export function normalizeSubtitleTracks(
   return result;
 }
 
+export interface ParallelRaceCandidateResult {
+  serverIndex: number;
+  success: boolean;
+  link?: string | null;
+}
 
+export interface ParallelRaceDecision {
+  shouldClaimPlayback: boolean;
+  nextWinnerIndex: number | null;
+  status: 'connecting' | 'available' | 'failed';
+  state: 'SELECTED' | 'AVAILABLE' | 'FAILED';
+}
 
+/**
+ * Deterministically evaluates an incoming parallel server resolution result:
+ * - The first server to resolve a valid playable stream (`success && Boolean(link)`)
+ *   when `currentWinnerIndex === null` immediately claims playback (`shouldClaimPlayback: true`).
+ * - Any subsequent server that resolves a valid playable stream is marked `'available'` (`'AVAILABLE'`)
+ *   and cached for zero-latency switching without interrupting the active winner.
+ * - Any server that returns no valid link is marked `'failed'` (`'FAILED'`).
+ */
+export function selectFirstConnectedWinner(
+  currentWinnerIndex: number | null,
+  candidate: ParallelRaceCandidateResult
+): ParallelRaceDecision {
+  const isValid = Boolean(
+    candidate.success && typeof candidate.link === 'string' && candidate.link.trim().length > 0
+  );
+  if (!isValid) {
+    return {
+      shouldClaimPlayback: false,
+      nextWinnerIndex: currentWinnerIndex,
+      status: 'failed',
+      state: 'FAILED',
+    };
+  }
 
+  if (currentWinnerIndex === null) {
+    return {
+      shouldClaimPlayback: true,
+      nextWinnerIndex: candidate.serverIndex,
+      status: 'connecting',
+      state: 'SELECTED',
+    };
+  }
+
+  if (currentWinnerIndex === candidate.serverIndex) {
+    return {
+      shouldClaimPlayback: false,
+      nextWinnerIndex: currentWinnerIndex,
+      status: 'available',
+      state: 'SELECTED',
+    };
+  }
+
+  return {
+    shouldClaimPlayback: false,
+    nextWinnerIndex: currentWinnerIndex,
+    status: 'available',
+    state: 'AVAILABLE',
+  };
+}
+
+/**
+ * Orders a server list so the preferred `startIdx` is launched first in the parallel race,
+ * followed by all remaining servers in index order.
+ */
+export function orderServersForParallelRace<T extends { index: number }>(
+  servers: readonly T[],
+  startIdx: number
+): T[] {
+  if (!servers.length) return [];
+  const clamped = Math.max(0, Math.min(servers.length - 1, startIdx));
+  return [servers[clamped], ...servers.filter((_, idx) => idx !== clamped)];
+}

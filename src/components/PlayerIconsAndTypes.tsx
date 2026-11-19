@@ -218,6 +218,65 @@ export const PlayerDownloadSvg = () => (
   </svg>
 );
 
+export const GoatServerSvg: React.FC<{ className?: string }> = ({ className = 'w-4 h-4' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    className={`shrink-0 ${className}`}
+    aria-hidden="true"
+  >
+    {/* Crown above GOAT horns */}
+    <path
+      d="M8.8 5.2L10.3 2.5L12 4.6L13.7 2.5L15.2 5.2H8.8Z"
+      fill="#fbbf24"
+      stroke="#fbbf24"
+      strokeWidth="1.2"
+      strokeLinejoin="round"
+    />
+    {/* Sweeping Curved Left Horn */}
+    <path
+      d="M8.6 7.8C6.5 4.6 2.6 4.6 1.8 7.6C1.1 10.1 3.3 12.2 5.6 11.4"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Sweeping Curved Right Horn */}
+    <path
+      d="M15.4 7.8C17.5 4.6 21.4 4.6 22.2 7.6C22.9 10.1 20.7 12.2 18.4 11.4"
+      stroke="currentColor"
+      strokeWidth="2.1"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Geometric GOAT Crest Head & Beard */}
+    <path
+      d="M7.6 8.2L12 6.6L16.4 8.2L15.5 15.1L12 19.4L8.5 15.1L7.6 8.2Z"
+      fill="currentColor"
+      fillOpacity="0.18"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinejoin="round"
+    />
+    {/* Sharp Goatee Tip */}
+    <path
+      d="M10.8 18.2L12 21.6L13.2 18.2"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    {/* Angled Glowing Eyes */}
+    <path
+      d="M9.5 11.8L11.1 12.6M14.5 11.8L12.9 12.6"
+      stroke="#fbbf24"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+    />
+  </svg>
+);
+
 export const EpisodesToggleSvg = () => (
   <>
     <svg
@@ -587,7 +646,10 @@ export const PlayerServerCarousel: React.FC<{
               (authoritativeState === 'SELECTED' && srv.status !== 'available' && srv.status !== 'failed');
             const isFailed = srv.status === 'failed' || authoritativeState === 'FAILED';
 
-            const subtitle = SERVER_SUBTITLES[srv.code] || 'High Quality Stream';
+            const subtitle =
+              SERVER_SUBTITLES[srv.code] ||
+              SERVER_SUBTITLES[srv.code.replace(/^(nx-|zxc-)/, '')] ||
+              'High Quality Stream';
 
             const statusLabel =
               isSelected && isAvailable

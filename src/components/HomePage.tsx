@@ -23,6 +23,7 @@ import {
   buildEmbedIframeCode,
 } from '../utils/urlBuilder';
 import { CustomPlayerView } from './CustomPlayerView';
+import { GoatServerSvg } from './PlayerIconsAndTypes';
 import { AnimePlayer } from '../anime/AnimePlayer';
 import { AnnouncementModal } from './AnnouncementModal';
 
@@ -55,7 +56,7 @@ export const HomePage: React.FC<HomePageProps> = ({
   onNavigateDownload,
   onOpenStandalonePlayer,
 }) => {
-  const [playerMode, setPlayerMode] = useState<PlayerMode>('custom');
+  const [playerMode, setPlayerMode] = useState<PlayerMode>('omni');
   const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [tmdbId, setTmdbId] = useState<string>('128');
   const [season, setSeason] = useState<string>('1');
@@ -144,7 +145,9 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Dynamic Brand Identity & Restrained Lighting per Player
   const brandTitle =
-    playerMode === 'bingr'
+    playerMode === 'omni'
+      ? 'GOAT SERVER'
+      : playerMode === 'bingr'
       ? 'BINGR CRACK'
       : playerMode === 'overpower'
       ? 'OVER POWER'
@@ -155,7 +158,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'ZXCSTREAM';
 
   const lampRgba =
-    playerMode === 'bingr'
+    playerMode === 'omni'
+      ? 'rgba(16, 185, 129, 0.78)'
+      : playerMode === 'bingr'
       ? 'rgba(245, 158, 11, 0.75)'
       : playerMode === 'overpower'
       ? 'rgba(168, 85, 247, 0.7)'
@@ -166,7 +171,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'rgba(37, 99, 235, 0.7)';
 
   const lampGlowSoftClass =
-    playerMode === 'bingr'
+    playerMode === 'omni'
+      ? 'bg-emerald-500/10'
+      : playerMode === 'bingr'
       ? 'bg-amber-600/10'
       : playerMode === 'overpower'
       ? 'bg-purple-600/10'
@@ -177,7 +184,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'bg-blue-600/10';
 
   const lampBarClass =
-    playerMode === 'bingr'
+    playerMode === 'omni'
+      ? 'bg-emerald-500/75'
+      : playerMode === 'bingr'
       ? 'bg-amber-500/70'
       : playerMode === 'overpower'
       ? 'bg-purple-600/70'
@@ -188,7 +197,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'bg-blue-600/70';
 
   const activeButtonClass =
-    playerMode === 'bingr'
+    playerMode === 'omni'
+      ? 'bg-emerald-600 text-white shadow-md scale-100'
+      : playerMode === 'bingr'
       ? 'bg-amber-600 text-white shadow-md scale-100'
       : playerMode === 'overpower'
       ? 'bg-purple-900 text-white shadow-md scale-100'
@@ -317,6 +328,19 @@ export const HomePage: React.FC<HomePageProps> = ({
             >
               BINGR CRACK
             </button>
+            <button
+              type="button"
+              onClick={() => handleSelectPlayer('omni')}
+              data-testid="header-engine-omni"
+              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md transition-all duration-300 cursor-pointer font-semibold ${
+                playerMode === 'omni'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <GoatServerSvg className="w-4 h-4 text-emerald-200" />
+              <span>GOAT</span>
+            </button>
           </div>
         </div>
 
@@ -382,7 +406,9 @@ export const HomePage: React.FC<HomePageProps> = ({
             </h1>
 
             <p className="text-zinc-400 text-xs lg:text-base max-w-lg mt-2">
-              {playerMode === 'bingr'
+              {playerMode === 'omni'
+                ? 'Unified Parallel Engine combining BINGR CRACK, OVER POWER, ZXCSTREAM & NXSHA — all servers race simultaneously and whichever connects first plays instantly'
+                : playerMode === 'bingr'
                 ? 'Dedicated Bingr Crack Cinema Engine for Movies & TV Shows with 100% Ad-Free playback and instant stream resolution'
                 : playerMode === 'anime'
                 ? 'Dedicated anime streaming player with TMDB anime verification and multi-audio Sub & Dub playback'
@@ -463,6 +489,19 @@ export const HomePage: React.FC<HomePageProps> = ({
               >
                 <Zap className="w-4 h-4 text-amber-300" />
                 <span>BINGR CRACK</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPlayer('omni')}
+                data-testid="toggle-omni-player"
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-xs lg:text-sm cursor-pointer transition-all duration-300 ${
+                  playerMode === 'omni'
+                    ? 'bg-emerald-600 text-white shadow-md scale-100'
+                    : 'text-zinc-400 hover:text-zinc-50'
+                }`}
+              >
+                <GoatServerSvg className="w-4 h-4 text-emerald-200" />
+                <span>GOAT SERVER</span>
               </button>
             </div>
 
@@ -769,11 +808,17 @@ export const HomePage: React.FC<HomePageProps> = ({
           )}
 
           {/* QUERY PARAMETERS Documentation Section */}
-          {(playerMode === 'custom' || playerMode === 'nxsha' || playerMode === 'overpower' || playerMode === 'bingr') && (
+          {(playerMode === 'custom' ||
+            playerMode === 'nxsha' ||
+            playerMode === 'overpower' ||
+            playerMode === 'bingr' ||
+            playerMode === 'omni') && (
             <div className="mt-10 w-full max-w-4xl text-left">
               <div className="space-y-5">
                 <h2 className="text-sm font-mono tracking-wider text-zinc-400 uppercase mb-6">
-                  {playerMode === 'bingr'
+                  {playerMode === 'omni'
+                    ? 'GOAT SERVER Unified Race Engine & Parameters'
+                    : playerMode === 'bingr'
                     ? 'BINGR CRACK Engine & Parameters'
                     : playerMode === 'overpower'
                     ? 'OVER POWER Engine & Parameters'
@@ -781,6 +826,26 @@ export const HomePage: React.FC<HomePageProps> = ({
                     ? 'NXSHA Engine & Parameters'
                     : 'Query Parameters'}
                 </h2>
+
+                {playerMode === 'omni' && (
+                  <div className="space-y-4 text-sm border-b border-zinc-800 pb-5">
+                    <div className="font-mono text-zinc-50 text-base flex items-center gap-2">
+                      <GoatServerSvg className="w-4 h-4 text-emerald-400" />
+                      <span>GOAT SERVER Unified Parallel Race Endpoints</span>
+                    </div>
+                    <p className="text-zinc-400 leading-relaxed">
+                      Combines every server from BINGR CRACK, OVER POWER, ZXCSTREAM, and NXSHA into one parallel streaming race. All 63 servers launch simultaneously and the very first server to respond plays instantaneously, while the remaining available servers stay cached for 0ms switching.
+                    </p>
+                    <div>
+                      <div className="font-mono text-xs uppercase tracking-wider text-zinc-400 mb-2">
+                        Usage
+                      </div>
+                      <pre className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-xs font-mono overflow-x-auto text-zinc-200">
+                        {`/goat/movie/1381071\n/goat/tv/1396/1/1\n/omni/movie/1381071`}
+                      </pre>
+                    </div>
+                  </div>
+                )}
 
                 {playerMode === 'bingr' && (
                   <div className="space-y-4 text-sm border-b border-zinc-800 pb-5">

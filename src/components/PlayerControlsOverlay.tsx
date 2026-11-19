@@ -26,6 +26,7 @@ import {
   EpisodesToggleSvg,
   FullscreenEnterSvg,
   FullscreenExitSvg,
+  GoatServerSvg,
   PauseSvg,
   PlaySvg,
   PlayerDownloadSvg,
@@ -388,6 +389,12 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
             BINGR CRACK · ZERO ADS
           </span>
         )}
+        {playerMode === 'omni' && (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[11px] font-bold tracking-wider">
+            <GoatServerSvg className="w-4 h-4 text-emerald-300" />
+            <span>GOAT SERVER · FIRST CONNECTED 🥇</span>
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-3">
         {onOpenDownload && (
@@ -406,7 +413,11 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
             <span className="hidden sm:inline">Download</span>
           </button>
         )}
-        {(playerMode === 'custom' || playerMode === 'nxsha' || playerMode === 'overpower' || playerMode === 'bingr') && (
+        {(playerMode === 'custom' ||
+          playerMode === 'nxsha' ||
+          playerMode === 'overpower' ||
+          playerMode === 'bingr' ||
+          playerMode === 'omni') && (
           <button
             type="button"
             aria-label="Toggle Servers"
@@ -571,7 +582,9 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
                 <>
                   {(playerMode === 'custom' ||
                     playerMode === 'nxsha' ||
-                    playerMode === 'overpower') && (
+                    playerMode === 'overpower' ||
+                    playerMode === 'bingr' ||
+                    playerMode === 'omni') && (
                     <button
                       type="button"
                       data-testid="settings-open-servers"
