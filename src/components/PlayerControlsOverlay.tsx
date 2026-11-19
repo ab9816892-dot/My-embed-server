@@ -26,10 +26,8 @@ import {
   EpisodesToggleSvg,
   FullscreenEnterSvg,
   FullscreenExitSvg,
-  GoatServerSvg,
   PauseSvg,
   PlaySvg,
-  PlayerDownloadSvg,
   Rewind10Svg,
   Forward10Svg,
   ServerInboxSvg,
@@ -275,7 +273,6 @@ export interface PlayerControlsOverlayProps {
   onSelectDub: (code: string, typeVal: number | string) => void;
   isFullscreen: boolean;
   onToggleFullscreen: () => void;
-  onOpenDownload?: () => void;
 }
 
 export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
@@ -284,7 +281,6 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
   playing,
   showBackButton,
   onBack,
-  onOpenDownload,
   showEpisodeDrawer,
   activeMediaType,
   selectedSeasonForDrawer,
@@ -389,35 +385,9 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
             BINGR CRACK · ZERO ADS
           </span>
         )}
-        {playerMode === 'omni' && (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-mono text-[11px] font-bold tracking-wider">
-            <GoatServerSvg className="w-4 h-4 text-emerald-300" />
-            <span>GOAT SERVER · FIRST CONNECTED 🥇</span>
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-3">
-        {onOpenDownload && (
-          <button
-            type="button"
-            aria-label="Download Media"
-            data-testid="player-download-button"
-            title="Download Movie or Episode"
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpenDownload();
-            }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 backdrop-blur-xs text-xs font-semibold text-white transition cursor-pointer shadow-xs border border-white/10"
-          >
-            <PlayerDownloadSvg />
-            <span className="hidden sm:inline">Download</span>
-          </button>
-        )}
-        {(playerMode === 'custom' ||
-          playerMode === 'nxsha' ||
-          playerMode === 'overpower' ||
-          playerMode === 'bingr' ||
-          playerMode === 'omni') && (
+        {(playerMode === 'custom' || playerMode === 'nxsha' || playerMode === 'overpower' || playerMode === 'bingr') && (
           <button
             type="button"
             aria-label="Toggle Servers"
@@ -582,9 +552,7 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
                 <>
                   {(playerMode === 'custom' ||
                     playerMode === 'nxsha' ||
-                    playerMode === 'overpower' ||
-                    playerMode === 'bingr' ||
-                    playerMode === 'omni') && (
+                    playerMode === 'overpower') && (
                     <button
                       type="button"
                       data-testid="settings-open-servers"
@@ -598,28 +566,6 @@ export const PlayerControlsOverlay: React.FC<PlayerControlsOverlayProps> = ({
                       <span className="text-zinc-300 font-medium">Servers</span>
                       <span className="flex items-center gap-1 font-semibold text-white">
                         Switch
-                        <ChevronRight className="w-4 h-4 text-zinc-400" />
-                      </span>
-                    </button>
-                  )}
-                  {onOpenDownload && (
-                    <button
-                      type="button"
-                      data-testid="settings-open-download"
-                      onClick={() => {
-                        setSettingsOpen(false);
-                        setShowEpisodeDrawer(false);
-                        setShowServersOverlay(false);
-                        onOpenDownload();
-                      }}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-xl hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors cursor-pointer text-blue-400"
-                    >
-                      <span className="text-zinc-200 font-medium flex items-center gap-2">
-                        <PlayerDownloadSvg />
-                        Download
-                      </span>
-                      <span className="flex items-center gap-1 font-semibold text-blue-400 text-xs">
-                        MP4 Files
                         <ChevronRight className="w-4 h-4 text-zinc-400" />
                       </span>
                     </button>

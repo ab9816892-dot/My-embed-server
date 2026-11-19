@@ -10,7 +10,6 @@ import {
   OVERPOWER_SERVERS,
   BINGR_SERVERS,
   NXSHA_SERVERS,
-  OMNI_SERVERS,
   RawOrionDub,
   detectSingleStreamLanguage,
   evaluatePlaybackSkipState,
@@ -20,12 +19,10 @@ import {
   matchNxshaSourceForDub,
   mergeAvailableDubs,
   normalizeSubtitleTracks,
-  orderServersForParallelRace,
   parsePlayerQueryParams,
   resolveEffectiveDubSelection,
   resolveEpisodeTiming,
   resolveNextEpisode,
-  selectFirstConnectedWinner,
   shouldSyncDubAudioTime,
 } from '../utils/urlBuilder.js';
 import {
@@ -51,7 +48,6 @@ import {
   canPlayHevcInBrowser,
 } from './PlayerIconsAndTypes.js';
 import { PlayerControlsOverlay, SmartPlaybackControls } from './PlayerControlsOverlay.js';
-import { PlayerDownloadModal } from './PlayerDownloadModal.js';
 
 export type { CustomPlayerViewProps };
 
@@ -91,49 +87,13 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
   const [currentSeason, setCurrentSeason] = useState<number>(initialSeason || 1);
   const [currentEpisode, setCurrentEpisode] = useState<number>(initialEpisode || 1);
 
-  const buildInstantMetadata = useCallback((mType: MediaType, rawId: string): TmdbMetadata => {
-    const cleanId = rawId.trim() || '128';
-    const fallback = getMediaByTmdbId(mType, cleanId);
-    const seasons: TmdbSeasonSummary[] = (fallback.seasons || []).map((s) => ({
-      season_number: s.seasonNumber,
-      episode_count: s.episodeCount,
-      name: s.name,
-    }));
-    return {
-      id: Number(cleanId.replace(/\D/g, '')) || Number(fallback.tmdbId) || 128,
-      mediaType: mType,
-      title: fallback.title,
-      originalTitle: fallback.title,
-      year: fallback.releaseYear,
-      releaseDate: `${fallback.releaseYear}-01-01`,
-      lastAirDate: '',
-      imdbId: getSeriesImdbId(cleanId) || '',
-      backdropPaths: fallback.backdropUrl ? [fallback.backdropUrl] : [],
-      logoPaths: fallback.logoUrl ? [fallback.logoUrl] : [],
-      genres: fallback.genres,
-      status: fallback.status,
-      seasons,
-      overview:
-        fallback.overview ||
-        "Years after the battle with Earth's greatest enemy, Majin Buu, the planet's savior Son Goku spends his days in peace.",
-      rating: (fallback as any).rating || 9.7,
-      runtime: (fallback as any).runtimeMinutes || undefined,
-    };
-  }, []);
-
-  const [metadata, setMetadata] = useState<TmdbMetadata | null>(() =>
-    buildInstantMetadata(initialMediaType, tmdbId)
-  );
-  const metadataRef = useRef<TmdbMetadata | null>(metadata);
-  metadataRef.current = metadata;
+  const [metadata, setMetadata] = useState<TmdbMetadata | null>(null);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [pauseLogoError, setPauseLogoError] = useState<boolean>(false);
 
   // Server probing state matching zxcstream.cc u2 component
   const activeServerList =
-    playerMode === 'omni'
-      ? OMNI_SERVERS
-      : playerMode === 'nxsha'
+    playerMode === 'nxsha'
       ? NXSHA_SERVERS
       : playerMode === 'overpower'
       ? OVERPOWER_SERVERS
@@ -153,7 +113,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
     Math.max(0, Math.min(activeServerList.length - 1, initialServer))
   );
   const [showServersOverlay, setShowServersOverlay] = useState<boolean>(false);
-  const [downloadModalOpen, setDownloadModalOpen] = useState<boolean>(false);
 
   // Strict Anti-Ad & Anti-Popup Interceptor (blocks all window.open popups and ad redirects)
   useEffect(() => {
@@ -555,10 +514,10 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       const streamUrl: string = sourceObj.url;
       const streamType: string =
         sourceObj.type ||
-        (streamUrl.toLowerCase().includes('.mp4') || streamUrl.includes('bingr-h264')
-          ? 'mp4'
-          : streamUrl.includes('.m3u8') || streamUrl.includes('/api/nxsha/proxy')
+        (streamUrl.includes('.m3u8') || streamUrl.includes('/api/nxsha/proxy')
           ? 'hls'
+          : streamUrl.includes('.mp4')
+          ? 'mp4'
           : 'hls');
 
       if (
@@ -671,11 +630,11 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
     if (!cleanId) return;
 
     let cancelled = false;
-    const instantMeta = buildInstantMetadata(initialMediaType, cleanId);
-    metadataRef.current = instantMeta;
-    setMetadata(instantMeta);
+    setMetadata(null);
     setMetadataError(null);
     setPauseLogoError(false);
+    setCanPlay(false);
+    setPlaying(false);
 
     fetch(`/api/tmdb/details/${ initialMediaType }/${encodeURIComponent(cleanId)}`)
       .then(async (res) => {
@@ -1029,7 +988,7 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
     setServers((prev) =>
       prev.map((srv, i) => {
         if (i !== idx) {
-          if (srv.state === 'SELECTED' && (status === 'connecting' || status === 'available')) {
+          if (status === 'available' && playerMode === 'overpower' && srv.status === 'checking') {
             return { ...srv, status: 'available', state: 'AVAILABLE' };
           }
           return srv;
@@ -1047,7 +1006,7 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
         return { ...srv, status, state: nextState };
       })
     );
-  }, []);
+  }, [playerMode]);
 
   const syncNxshaStateMachineToUi = useCallback((sessionId?: string) => {
     const machine = nxshaStateMachineRef.current;
@@ -1159,10 +1118,10 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       const streamUrl: string = chosenSource.url;
       const streamType: string =
         chosenSource.type ||
-        (streamUrl.toLowerCase().includes('.mp4') || streamUrl.includes('bingr-h264')
-          ? 'mp4'
-          : streamUrl.includes('.m3u8') || streamUrl.includes('/api/nxsha/proxy')
+        (streamUrl.includes('.m3u8') || streamUrl.includes('/api/nxsha/proxy')
           ? 'hls'
+          : streamUrl.includes('.mp4')
+          ? 'mp4'
           : 'hls');
 
       const videoEl = videoRef.current;
@@ -1248,7 +1207,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
           const hls = new Hls({
             enableWorker: true,
             progressive: false,
-            startFragPrefetch: true,
             startPosition: resumeFromServerSwitch > 0.5 ? resumeFromServerSwitch : -1,
             loader: createMpegTsAudioSelectingLoader() as any,
             maxBufferLength: 30,
@@ -1594,19 +1552,21 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
         })
         .catch(() => {});
 
-      // Launch all 42 NXSHA providers 100% simultaneously at t = 0ms over a single streaming NDJSON race
-      // so the very first server to respond plays immediately without browser connection-pool queuing!
-      const raceCtrl = new AbortController();
-      nxshaAbortControllerRef.current = raceCtrl;
+      // Launch discovery requests across all eligible NXSHA providers with a bounded concurrency pool (max 4 concurrent requests)
+      // so the winning server starts immediately and background server probing never starves video segment requests.
+      const runSingleServerDiscovery = async (srv: (typeof orderedServers)[number]) => {
+        const reqId = requestIdsByProvider.get(srv.id);
+        if (!reqId || !machine.isCurrentSession(sessionId)) return;
 
-      void (async () => {
+        const ctrl = new AbortController();
+        nxshaProviderControllersRef.current.set(srv.id, ctrl);
+
         try {
-          const res = await fetch('/api/goat/race', {
+          const res = await fetch('/api/nxsha/resolve', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            signal: raceCtrl.signal,
+            signal: ctrl.signal,
             body: JSON.stringify({
-              mode: 'nxsha',
               tmdbId: String(meta.id),
               mediaType: meta.mediaType,
               season: meta.mediaType === 'tv' ? currentSeason : 1,
@@ -1614,157 +1574,148 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
               title: meta.title,
               originalTitle: meta.originalTitle || meta.title,
               year: meta.year,
+              preferredServer: srv.id,
+              strictSingleServer: true,
+              allowFallback: false,
+              excludeServers: machine.getFailedProviderCodes(sessionId),
               imdbId: meta.imdbId,
               dubCode: dubCodeToUse,
               dubLang: dubCodeToUse,
-              startServerIdx: clampedStart,
             }),
           });
 
-          if (!res.ok || !res.body) {
-            throw new Error('NXSHA parallel race failed');
+          if (!machine.isCurrentSession(sessionId)) return;
+          const data = await res.json().catch(() => null);
+          if (!machine.isCurrentSession(sessionId)) return;
+
+          if (Array.isArray(data?.dubs) && data.dubs.length > 0) {
+            setAvailableDubs((prev) => mergeAvailableDubs(prev, data.dubs));
+          }
+          if (Array.isArray(data?.subtitles) && data.subtitles.length > 0) {
+            setSubtitles((prev) => normalizeSubtitleTracks(prev, data.subtitles));
           }
 
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          const handleNxshaRaceLine = (line: string) => {
-            const trimmed = line.trim();
-            if (!trimmed || !machine.isCurrentSession(sessionId)) return;
-            let ev: any = null;
-            try {
-              ev = JSON.parse(trimmed);
-            } catch {
-              return;
-            }
-            if (!ev) return;
-
-            if (ev.type === 'subtitles' && Array.isArray(ev.subtitles) && ev.subtitles.length > 0) {
-              setSubtitles((prev) => normalizeSubtitleTracks(prev, ev.subtitles));
-              return;
-            }
-
-            if (ev.type === 'done') {
-              if (machine.getVisibleServers(sessionId).length === 0) {
-                void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
-              }
-              return;
-            }
-
-            if (ev.type !== 'result' || !ev.id) return;
-            const reqId = requestIdsByProvider.get(ev.id);
-            if (!reqId) return;
-
-            if (Array.isArray(ev.dubs) && ev.dubs.length > 0) {
-              setAvailableDubs((prev) => mergeAvailableDubs(prev, ev.dubs));
-            }
-            if (Array.isArray(ev.subtitles) && ev.subtitles.length > 0) {
-              setSubtitles((prev) => normalizeSubtitleTracks(prev, ev.subtitles));
-            }
-
-            const rawSources = Array.isArray(ev.sources) ? ev.sources : [];
-            if (!ev.success || rawSources.length === 0) {
-              const failRes = machine.markProviderFailed(
-                sessionId,
-                ev.id,
-                'No valid playable sources',
-                { requestId: reqId }
-              );
-              syncNxshaStateMachineToUi(sessionId);
-
-              if (failRes.wasSelected) {
-                handleNxshaPlaybackFailure(
-                  sessionId,
-                  ev.id,
-                  meta,
-                  dubCodeToUse,
-                  'Selected provider returned no valid sources'
-                );
-              } else if (machine.getVisibleServers(sessionId).length === 0) {
-                void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
-              }
-              return;
-            }
-
-            const successRes = machine.resolveProviderSuccess(
+          const rawSources = Array.isArray(data?.sources) ? data.sources : [];
+          if (!res.ok || !data?.success || rawSources.length === 0) {
+            const failRes = machine.markProviderFailed(
               sessionId,
-              ev.id,
-              {
-                sources: rawSources,
-                subtitles: ev.subtitles,
-                dubs: ev.dubs,
-              },
-              { requestId: reqId, autoSelectIfNoWinner: true }
+              srv.id,
+              data?.error || 'No valid playable sources',
+              { requestId: reqId }
             );
             syncNxshaStateMachineToUi(sessionId);
 
-            if (!successRes.applied) return;
+            if (failRes.wasSelected) {
+              handleNxshaPlaybackFailure(
+                sessionId,
+                srv.id,
+                meta,
+                dubCodeToUse,
+                'Selected provider returned no valid sources'
+              );
+            } else if (machine.getVisibleServers(sessionId).length === 0) {
+              void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
+            }
+            return;
+          }
 
-            if (successRes.state === 'FAILED') {
-              if (machine.getVisibleServers(sessionId).length === 0) {
-                void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
+          const successRes = machine.resolveProviderSuccess(
+            sessionId,
+            srv.id,
+            {
+              sources: rawSources,
+              subtitles: data.subtitles,
+              dubs: data.dubs,
+            },
+            { requestId: reqId, autoSelectIfNoWinner: true }
+          );
+          syncNxshaStateMachineToUi(sessionId);
+
+          if (!successRes.applied) return;
+
+          if (successRes.state === 'FAILED') {
+            if (machine.getVisibleServers(sessionId).length === 0) {
+              void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
+            }
+            return;
+          }
+
+          if (
+            successRes.becameSelected &&
+            successRes.state === 'SELECTED' &&
+            currentPlayingProviderRef.current !== srv.id
+          ) {
+            if (!recordedFirstWinnerTime) {
+              recordedFirstWinnerTime = true;
+              const elapsedMs = Number(
+                Math.max(
+                  0,
+                  (typeof performance !== 'undefined' && performance.now
+                    ? performance.now()
+                    : Date.now()) - sessionStartMs
+                ).toFixed(2)
+              );
+              const diag: NxshaDiscoveryDiagnostics = {
+                discoveryStartTimeMs: Number(sessionStartMs.toFixed(2)),
+                timeToFirstValidSourceMs:
+                  data?.diagnostics?.timeToFirstValidSourceMs ?? elapsedMs,
+                totalDiscoveryDurationMs: elapsedMs,
+                winningProvider: srv.id,
+                totalProvidersQueried: orderedServers.length,
+                totalFailedProviders: machine.getFailedProviderCodes(sessionId).length,
+                cancelledProvidersCount: 0,
+                lateIgnoredCount: 0,
+                providerTimings: data?.diagnostics?.providerTimings || [],
+              };
+              setNxshaDiagnostics(diag);
+              if (typeof window !== 'undefined') {
+                (window as any).__NXSHA_LAST_DIAGNOSTICS__ = diag;
               }
-              return;
             }
 
-            if (
-              successRes.becameSelected &&
-              successRes.state === 'SELECTED' &&
-              currentPlayingProviderRef.current !== ev.id
-            ) {
-              if (!recordedFirstWinnerTime) {
-                recordedFirstWinnerTime = true;
-                const elapsedMs = Number(
-                  Math.max(
-                    0,
-                    (typeof performance !== 'undefined' && performance.now
-                      ? performance.now()
-                      : Date.now()) - sessionStartMs
-                  ).toFixed(2)
-                );
-                const diag: NxshaDiscoveryDiagnostics = {
-                  discoveryStartTimeMs: Number(sessionStartMs.toFixed(2)),
-                  timeToFirstValidSourceMs: elapsedMs,
-                  totalDiscoveryDurationMs: elapsedMs,
-                  winningProvider: ev.id,
-                  totalProvidersQueried: orderedServers.length,
-                  totalFailedProviders: machine.getFailedProviderCodes(sessionId).length,
-                  cancelledProvidersCount: 0,
-                  lateIgnoredCount: 0,
-                  providerTimings: [],
-                };
-                setNxshaDiagnostics(diag);
-                if (typeof window !== 'undefined') {
-                  (window as any).__NXSHA_LAST_DIAGNOSTICS__ = diag;
-                }
-              }
-
-              attachNxshaPlayback(sessionId, ev.id, successRes.validSources, dubCodeToUse, meta);
-            }
-          };
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (!machine.isCurrentSession(sessionId)) break;
-            if (value) {
-              buffer += decoder.decode(value, { stream: !done });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-              for (const line of lines) {
-                handleNxshaRaceLine(line);
-              }
-            }
-            if (done) {
-              if (buffer.trim()) handleNxshaRaceLine(buffer);
-              break;
-            }
+            attachNxshaPlayback(sessionId, srv.id, successRes.validSources, dubCodeToUse, meta);
           }
         } catch {
-          if (!machine.isCurrentSession(sessionId) || raceCtrl.signal.aborted) return;
-          void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
+          if (!machine.isCurrentSession(sessionId)) return;
+          if (ctrl.signal.aborted) return;
+
+          const failRes = machine.markProviderFailed(
+            sessionId,
+            srv.id,
+            'Network request failed',
+            { requestId: reqId }
+          );
+          syncNxshaStateMachineToUi(sessionId);
+
+          if (failRes.wasSelected) {
+            handleNxshaPlaybackFailure(
+              sessionId,
+              srv.id,
+              meta,
+              dubCodeToUse,
+              'Selected provider network request failed'
+            );
+          } else if (machine.getVisibleServers(sessionId).length === 0) {
+            void runNxshaVerifiedFallback(sessionId, meta, dubCodeToUse);
+          }
         }
-      })();
+      };
+
+      let cursor = 0;
+      const CONCURRENCY_LIMIT = 4;
+      const runDiscoveryWorker = async () => {
+        while (cursor < orderedServers.length && machine.isCurrentSession(sessionId)) {
+          const nextIdx = cursor++;
+          const srv = orderedServers[nextIdx];
+          if (srv) {
+            await runSingleServerDiscovery(srv);
+          }
+        }
+      };
+
+      for (let w = 0; w < Math.min(CONCURRENCY_LIMIT, orderedServers.length); w++) {
+        void runDiscoveryWorker();
+      }
     },
     [
       attachNxshaPlayback,
@@ -1775,226 +1726,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       runNxshaVerifiedFallback,
       syncNxshaStateMachineToUi,
     ]
-  );
-
-  const discoveryRunIdRef = useRef<number>(0);
-  const raceWinnerIndexRef = useRef<number | null>(null);
-  const resolvedServerPayloadCacheRef = useRef<Map<string, any>>(new Map());
-  const serverAbortControllersRef = useRef<Map<number, AbortController>>(new Map());
-
-  const getServerResolveCacheKey = useCallback(
-    (serverId: string, meta: TmdbMetadata, dubCodeToUse: string) => {
-      const seasonNum = meta.mediaType === 'tv' ? currentSeason : 1;
-      const episodeNum = meta.mediaType === 'tv' ? currentEpisode : 1;
-      const cleanDub = (dubCodeToUse || '').trim().toLowerCase();
-      return `${playerMode}:${serverId}:${meta.mediaType}:${meta.id}:${seasonNum}:${episodeNum}:${cleanDub}`;
-    },
-    [currentEpisode, currentSeason, playerMode]
-  );
-
-  const attachResolvedStreamData = useCallback(
-    (
-      serverIdx: number,
-      runId: number,
-      meta: TmdbMetadata,
-      dubCodeToUse: string,
-      data: any,
-      onAdvanceFallback: () => void
-    ) => {
-      if (probeRunIdRef.current !== runId) return;
-      const activeList =
-        playerMode === 'omni'
-          ? OMNI_SERVERS
-          : playerMode === 'overpower'
-          ? OVERPOWER_SERVERS
-          : playerMode === 'bingr'
-          ? BINGR_SERVERS
-          : PLAYER_SERVERS;
-      const serverDef = activeList[serverIdx];
-      if (!serverDef) return;
-      const upstreamId = (serverDef as any).upstreamId || serverDef.id;
-
-      setCurrentServerIndex(serverIdx);
-      updateServerStatus(serverIdx, 'connecting');
-      cleanupMediaEngines();
-      hasEstablishedPlaybackRef.current = false;
-      setCanPlay(false);
-      setPlaying(false);
-
-      loadedStreamDubRef.current =
-        serverIdx === 0 ||
-        upstreamId.startsWith('source-') ||
-        upstreamId.startsWith('bingr') ||
-        upstreamId === 'orion' ||
-        upstreamId === 'vegamovies'
-          ? dubCodeToUse.toLowerCase()
-          : '';
-
-      const videoEl = videoRef.current;
-      if (!videoEl) return;
-
-      connectWatchdogTimerRef.current = window.setTimeout(() => {
-        if (probeRunIdRef.current !== runId) return;
-        if (!videoRef.current || (videoRef.current.readyState < 1 && !hasEstablishedPlaybackRef.current)) {
-          onAdvanceFallback();
-        }
-      }, 14000);
-
-      const streamUrl: string = data.link;
-      const streamType: string =
-        data.type && data.type !== 'hls'
-          ? data.type
-          : streamUrl.toLowerCase().includes('.mp4') || streamUrl.includes('bingr-h264')
-          ? 'mp4'
-          : data.type || 'hls';
-
-      if (streamType === 'dash' || streamType === 'andromeda') {
-        const player = dashjs.MediaPlayer().create();
-        dashRef.current = player;
-        player.updateSettings({
-          streaming: {
-            buffer: { fastSwitchEnabled: true },
-            abr: { autoSwitchBitrate: { video: true, audio: true } },
-          },
-        });
-        player.initialize(videoEl, streamUrl, autoplay);
-
-        player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
-          if (probeRunIdRef.current !== runId) return;
-          const videoReps = player.getRepresentationsByType('video') || [];
-          if (!videoReps.length) {
-            onAdvanceFallback();
-            return;
-          }
-          const qList = videoReps
-            .map((rep: { height?: number }, idx: number) => ({
-              index: idx,
-              height: rep.height || 0,
-            }))
-            .filter((q: { height: number }) => q.height > 0);
-          setQualities(qList);
-
-          const aTracks = (player.getTracksFor('audio') || []) as any[];
-          setAudioTracks(
-            aTracks.map((t: any, i: number) => ({
-              id: i,
-              label: t.labels?.[0]?.text || t.lang || `Audio ${i + 1}`,
-              lang: t.lang || undefined,
-            }))
-          );
-        });
-
-        player.on(dashjs.MediaPlayer.events.ERROR, () => {
-          if (probeRunIdRef.current !== runId) return;
-          onAdvanceFallback();
-        });
-      } else if (
-        streamType !== 'mp4' &&
-        (streamType === 'hls' ||
-          streamUrl.includes('.m3u8') ||
-          streamUrl.includes('/api/stream/proxy') ||
-          streamUrl.includes('/api/nxsha/proxy'))
-      ) {
-        if (Hls.isSupported()) {
-          const hls = new Hls({
-            enableWorker: true,
-            startFragPrefetch: true,
-            maxBufferLength: 30,
-            fragLoadingMaxRetry: 2,
-            levelLoadingMaxRetry: 2,
-            manifestLoadingMaxRetry: 2,
-          });
-          hlsRef.current = hls;
-          hls.loadSource(streamUrl);
-          hls.attachMedia(videoEl);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, (_e, manifestData) => {
-            if (probeRunIdRef.current !== runId) return;
-            const qList = manifestData.levels
-              .map((lvl, idx) => ({ index: idx, height: lvl.height || 0 }))
-              .filter((q) => q.height > 0);
-            setQualities(qList);
-            if (autoplay) {
-              videoEl.play().catch(() => {
-                videoEl.muted = true;
-                setMuted(true);
-                videoEl.play().catch(() => {});
-              });
-            }
-          });
-
-          hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_e, audioData) => {
-            setAudioTracks(
-              audioData.audioTracks.map((t, idx) => ({
-                id: idx,
-                label: t.name || t.lang || `Track ${idx + 1}`,
-                lang: t.lang,
-              }))
-            );
-          });
-
-          hls.on(Hls.Events.ERROR, (_e, errData) => {
-            if (probeRunIdRef.current !== runId) return;
-            const isPrePlayNetworkError =
-              videoEl.readyState < 3 &&
-              (errData.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
-                errData.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT ||
-                errData.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
-                errData.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
-                errData.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
-                errData.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT);
-            if (errData.fatal || isPrePlayNetworkError) {
-              onAdvanceFallback();
-            }
-          });
-        } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-          videoEl.src = streamUrl;
-          if (autoplay) {
-            videoEl.play().catch(() => {});
-          }
-        } else {
-          onAdvanceFallback();
-        }
-      } else {
-        const candidateDirectUrls: string[] = Array.from(
-          new Set([
-            streamUrl,
-            ...(Array.isArray(data?.links)
-              ? data.links
-                  .map((l: any) => l?.link)
-                  .filter((u: any): u is string => typeof u === 'string' && u.length > 0)
-              : []),
-          ])
-        );
-        let directIdx = 0;
-
-        const tryNextDirectUrl = () => {
-          if (probeRunIdRef.current !== runId) return;
-          if (directIdx >= candidateDirectUrls.length) {
-            onAdvanceFallback();
-            return;
-          }
-          const nextUrl = candidateDirectUrls[directIdx++];
-          videoEl.src = nextUrl;
-          const onDirectError = () => {
-            videoEl.removeEventListener('error', onDirectError);
-            if (probeRunIdRef.current !== runId) return;
-            tryNextDirectUrl();
-          };
-          videoEl.addEventListener('error', onDirectError, { once: true });
-          if (autoplay) {
-            videoEl.play().catch(() => {
-              videoEl.muted = true;
-              setMuted(true);
-              videoEl.play().catch(() => {});
-            });
-          }
-        };
-
-        tryNextDirectUrl();
-      }
-    },
-    [autoplay, cleanupMediaEngines, playerMode, updateServerStatus]
   );
 
   const probeServerAtIndex = useCallback(
@@ -2012,9 +1743,7 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       }
 
       const activeList =
-        playerMode === 'omni'
-          ? OMNI_SERVERS
-          : playerMode === 'overpower'
+        playerMode === 'overpower'
           ? OVERPOWER_SERVERS
           : playerMode === 'bingr'
           ? BINGR_SERVERS
@@ -2022,58 +1751,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       if (serverIdx >= activeList.length) return;
 
       const serverDef = activeList[serverIdx];
-      const upstreamId = (serverDef as any).upstreamId || serverDef.id;
-      const resolveEngine: 'stream' | 'nxsha' = (serverDef as any).resolveEngine || 'stream';
-      const dubCodeForServer =
-        serverIdx === 0 ||
-        upstreamId.startsWith('source-') ||
-        upstreamId.startsWith('bingr') ||
-        upstreamId === 'orion' ||
-        upstreamId === 'vegamovies'
-          ? dubCodeToUse
-          : '';
-      const cacheKey = getServerResolveCacheKey(serverDef.id, meta, dubCodeForServer);
-
-      const advanceToNextServer = () => {
-        if (probeRunIdRef.current !== runId) return;
-        cleanupMediaEngines();
-        updateServerStatus(serverIdx, 'failed');
-        setServers((prev) => {
-          const nextReady =
-            prev.find(
-              (s, idx) =>
-                idx !== serverIdx &&
-                s.status === 'available' &&
-                s.state !== 'FAILED'
-            ) ||
-            prev.find(
-              (s, idx) => idx !== serverIdx && s.status !== 'failed' && s.state !== 'FAILED'
-            );
-          if (nextReady) {
-            raceWinnerIndexRef.current = nextReady.index;
-            window.setTimeout(() => {
-              void probeServerAtIndex(nextReady.index, runId, meta, dubCodeToUse);
-            }, 25);
-          }
-          return prev;
-        });
-      };
-
-      // Instant 0ms switch if this server's resolved stream is already cached from the parallel race!
-      const cachedData = resolvedServerPayloadCacheRef.current.get(cacheKey);
-      if (cachedData && cachedData.success && cachedData.link) {
-        raceWinnerIndexRef.current = serverIdx;
-        attachResolvedStreamData(
-          serverIdx,
-          runId,
-          meta,
-          dubCodeToUse,
-          cachedData,
-          advanceToNextServer
-        );
-        return;
-      }
-
       setCurrentServerIndex(serverIdx);
       updateServerStatus(serverIdx, 'checking');
       cleanupMediaEngines();
@@ -2083,77 +1760,24 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
 
       const allowHevc = canPlayHevcInBrowser();
 
-      try {
-        if (resolveEngine === 'nxsha') {
-          const res = await fetch('/api/nxsha/resolve', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tmdbId: String(meta.id),
-              mediaType: meta.mediaType,
-              season: meta.mediaType === 'tv' ? currentSeason : 1,
-              episode: meta.mediaType === 'tv' ? currentEpisode : 1,
-              title: meta.title,
-              originalTitle: meta.originalTitle || meta.title,
-              year: meta.year,
-              preferredServer: upstreamId,
-              strictSingleServer: true,
-              allowFallback: true,
-              imdbId: meta.imdbId,
-              dubCode: dubCodeToUse,
-              dubLang: dubCodeToUse,
-            }),
-          });
-          if (probeRunIdRef.current !== runId) return;
-          const rawData = await res.json().catch(() => null);
-          if (Array.isArray(rawData?.dubs) && rawData.dubs.length > 0) {
-            setAvailableDubs((prev) => mergeAvailableDubs(prev, rawData.dubs));
-          }
-          if (Array.isArray(rawData?.subtitles) && rawData.subtitles.length > 0) {
-            setSubtitles((prev) => normalizeSubtitleTracks(prev, rawData.subtitles));
-          }
-          const validSources = Array.isArray(rawData?.sources)
-            ? rawData.sources.filter((s: any) => s?.url && validatePlayableNxshaSource(s).valid)
-            : [];
-          const primarySrc = validSources[0] || null;
-          if (!res.ok || !rawData?.success || !primarySrc?.url) {
-            advanceToNextServer();
-            return;
-          }
-          const normalized = {
-            success: true,
-            link: primarySrc.url,
-            type:
-              primarySrc.type ||
-              (primarySrc.url.includes('.mp4')
-                ? 'mp4'
-                : primarySrc.url.includes('.mpd')
-                ? 'dash'
-                : 'hls'),
-            links: validSources.map((s: any) => ({
-              link: s.url,
-              type: s.type || 'hls',
-              quality: s.quality || '1080p',
-              label: s.label || serverDef.label,
-              lang: s.lang || 'en',
-            })),
-            sources: validSources,
-            dubs: rawData.dubs,
-            subtitles: rawData.subtitles,
-          };
-          resolvedServerPayloadCacheRef.current.set(cacheKey, normalized);
-          raceWinnerIndexRef.current = serverIdx;
-          attachResolvedStreamData(
-            serverIdx,
-            runId,
-            meta,
-            dubCodeToUse,
-            normalized,
-            advanceToNextServer
+      const advanceToNextServer = () => {
+        if (probeRunIdRef.current !== runId) return;
+        cleanupMediaEngines();
+        updateServerStatus(serverIdx, 'failed');
+        setServers((prev) => {
+          const nextCandidate = prev.find(
+            (s, idx) => idx !== serverIdx && s.status !== 'failed' && s.state !== 'FAILED'
           );
-          return;
-        }
+          if (nextCandidate) {
+            window.setTimeout(() => {
+              probeServerAtIndex(nextCandidate.index, runId, meta, dubCodeToUse);
+            }, 250);
+          }
+          return prev;
+        });
+      };
 
+      try {
         const res = await fetch('/api/stream/resolve', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2168,9 +1792,24 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
             date: meta.releaseDate,
             lastAirDate: meta.lastAirDate,
             imdbId: meta.imdbId,
-            dubCode: dubCodeForServer,
-            dubType: dubCodeForServer ? selectedDubTypeRef.current : '',
-            preferredServer: upstreamId,
+            dubCode:
+              serverIdx === 0 ||
+              serverDef.id.startsWith('source-') ||
+              serverDef.id.startsWith('bingr') ||
+              serverDef.id === 'orion' ||
+              serverDef.id === 'vegamovies'
+                ? dubCodeToUse
+                : '',
+            dubType:
+              (serverIdx === 0 ||
+                serverDef.id.startsWith('source-') ||
+                serverDef.id.startsWith('bingr') ||
+                serverDef.id === 'orion' ||
+                serverDef.id === 'vegamovies') &&
+              dubCodeToUse
+                ? selectedDubTypeRef.current
+                : '',
+            preferredServer: serverDef.id,
             strictSingleServer: true,
             allowHevc,
           }),
@@ -2189,59 +1828,199 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
           return;
         }
 
-        resolvedServerPayloadCacheRef.current.set(cacheKey, data);
-        raceWinnerIndexRef.current = serverIdx;
-        attachResolvedStreamData(
-          serverIdx,
-          runId,
-          meta,
-          dubCodeToUse,
-          data,
-          advanceToNextServer
-        );
+        updateServerStatus(serverIdx, 'connecting');
+        loadedStreamDubRef.current =
+          serverIdx === 0 ||
+          serverDef.id.startsWith('source-') ||
+          serverDef.id.startsWith('bingr') ||
+          serverDef.id === 'orion' ||
+          serverDef.id === 'vegamovies'
+            ? dubCodeToUse.toLowerCase()
+            : '';
+
+        const videoEl = videoRef.current;
+        if (!videoEl) return;
+
+        connectWatchdogTimerRef.current = window.setTimeout(() => {
+          if (probeRunIdRef.current !== runId) return;
+          if (!videoRef.current || (videoRef.current.readyState < 1 && !hasEstablishedPlaybackRef.current)) {
+            advanceToNextServer();
+          }
+        }, 14000);
+
+        const streamUrl: string = data.link;
+        const streamType: string = data.type || 'hls';
+
+        if (streamType === 'dash' || streamType === 'andromeda') {
+          const player = dashjs.MediaPlayer().create();
+          dashRef.current = player;
+          player.updateSettings({
+            streaming: {
+              buffer: { fastSwitchEnabled: true },
+              abr: { autoSwitchBitrate: { video: true, audio: true } },
+            },
+          });
+          player.initialize(videoEl, streamUrl, autoplay);
+
+          player.on(dashjs.MediaPlayer.events.STREAM_INITIALIZED, () => {
+            if (probeRunIdRef.current !== runId) return;
+            const videoReps = player.getRepresentationsByType('video') || [];
+            if (!videoReps.length) {
+              advanceToNextServer();
+              return;
+            }
+            const qList = videoReps
+              .map((rep: { height?: number }, idx: number) => ({
+                index: idx,
+                height: rep.height || 0,
+              }))
+              .filter((q: { height: number }) => q.height > 0);
+            setQualities(qList);
+
+            const aTracks = (player.getTracksFor('audio') || []) as any[];
+            setAudioTracks(
+              aTracks.map((t: any, i: number) => ({
+                id: i,
+                label: t.labels?.[0]?.text || t.lang || `Audio ${i + 1}`,
+                lang: t.lang || undefined,
+              }))
+            );
+          });
+
+          player.on(dashjs.MediaPlayer.events.ERROR, () => {
+            if (probeRunIdRef.current !== runId) return;
+            advanceToNextServer();
+          });
+        } else if (
+          streamType !== 'mp4' &&
+          (streamType === 'hls' ||
+            streamUrl.includes('.m3u8') ||
+            streamUrl.includes('/api/stream/proxy'))
+        ) {
+          if (Hls.isSupported()) {
+            const hls = new Hls({
+              enableWorker: true,
+              maxBufferLength: 30,
+              fragLoadingMaxRetry: 2,
+              levelLoadingMaxRetry: 2,
+              manifestLoadingMaxRetry: 2,
+            });
+            hlsRef.current = hls;
+            hls.loadSource(streamUrl);
+            hls.attachMedia(videoEl);
+
+            hls.on(Hls.Events.MANIFEST_PARSED, (_e, manifestData) => {
+              if (probeRunIdRef.current !== runId) return;
+              const qList = manifestData.levels
+                .map((lvl, idx) => ({ index: idx, height: lvl.height || 0 }))
+                .filter((q) => q.height > 0);
+              setQualities(qList);
+              if (autoplay) {
+                videoEl.play().catch(() => {
+                  videoEl.muted = true;
+                  setMuted(true);
+                  videoEl.play().catch(() => {});
+                });
+              }
+            });
+
+            hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_e, audioData) => {
+              setAudioTracks(
+                audioData.audioTracks.map((t, idx) => ({
+                  id: idx,
+                  label: t.name || t.lang || `Track ${idx + 1}`,
+                  lang: t.lang,
+                }))
+              );
+            });
+
+            hls.on(Hls.Events.ERROR, (_e, errData) => {
+              if (probeRunIdRef.current !== runId) return;
+              const isPrePlayNetworkError =
+                videoEl.readyState < 3 &&
+                (errData.details === Hls.ErrorDetails.FRAG_LOAD_ERROR ||
+                  errData.details === Hls.ErrorDetails.FRAG_LOAD_TIMEOUT ||
+                  errData.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR ||
+                  errData.details === Hls.ErrorDetails.LEVEL_LOAD_TIMEOUT ||
+                  errData.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR ||
+                  errData.details === Hls.ErrorDetails.MANIFEST_LOAD_TIMEOUT);
+              if (errData.fatal || isPrePlayNetworkError) {
+                advanceToNextServer();
+              }
+            });
+          } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+            videoEl.src = streamUrl;
+            if (autoplay) {
+              videoEl.play().catch(() => {});
+            }
+          } else {
+            advanceToNextServer();
+          }
+        } else {
+          const candidateDirectUrls: string[] = Array.from(
+            new Set([
+              streamUrl,
+              ...(Array.isArray(data?.links)
+                ? data.links.map((l: any) => l?.link).filter((u: any): u is string => typeof u === 'string' && u.length > 0)
+                : []),
+            ])
+          );
+          let directIdx = 0;
+
+          const tryNextDirectUrl = () => {
+            if (probeRunIdRef.current !== runId) return;
+            if (directIdx >= candidateDirectUrls.length) {
+              advanceToNextServer();
+              return;
+            }
+            const nextUrl = candidateDirectUrls[directIdx++];
+            videoEl.src = nextUrl;
+            const onDirectError = () => {
+              videoEl.removeEventListener('error', onDirectError);
+              if (probeRunIdRef.current !== runId) return;
+              tryNextDirectUrl();
+            };
+            videoEl.addEventListener('error', onDirectError, { once: true });
+            if (autoplay) {
+              videoEl.play().catch(() => {
+                videoEl.muted = true;
+                setMuted(true);
+                videoEl.play().catch(() => {});
+              });
+            }
+          };
+
+          tryNextDirectUrl();
+        }
       } catch {
         advanceToNextServer();
       }
     },
     [
-      attachResolvedStreamData,
+      autoplay,
       cleanupMediaEngines,
       currentEpisode,
       currentSeason,
-      getServerResolveCacheKey,
       playerMode,
       startNxshaParallelDiscovery,
       updateServerStatus,
     ]
   );
 
-  // Trigger parallel server racing when metadata, season, or episode changes
+  // Trigger server probing when metadata, season, or episode changes
   const initialDubRef = useRef<string>(selectedDub);
   initialDubRef.current = selectedDub;
 
-  const raceMediaId = metadata?.id || Number(tmdbId.trim().replace(/\D/g, '')) || 128;
-  const raceMediaType = metadata?.mediaType || initialMediaType;
-
   useEffect(() => {
-    const activeMeta = metadataRef.current || buildInstantMetadata(raceMediaType, String(raceMediaId));
+    if (!metadata) return;
     setAvailableDubs([]);
     setNxshaDiagnostics(null);
     failedNxshaProvidersRef.current.clear();
     hasEstablishedPlaybackRef.current = false;
     currentPlayingProviderRef.current = null;
-    raceWinnerIndexRef.current = null;
-    resolvedServerPayloadCacheRef.current.clear();
     const runId = ++probeRunIdRef.current;
-    const discoveryId = ++discoveryRunIdRef.current;
-    const activeList: ReadonlyArray<{
-      readonly index: number;
-      readonly id: string;
-      readonly label: string;
-      readonly upstreamId?: string;
-    }> =
-      playerMode === 'omni'
-        ? OMNI_SERVERS
-        : playerMode === 'nxsha'
+    const activeList =
+      playerMode === 'nxsha'
         ? NXSHA_SERVERS
         : playerMode === 'overpower'
         ? OVERPOWER_SERVERS
@@ -2251,361 +2030,35 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
     const startIdx = Math.max(0, Math.min(activeList.length - 1, initialServer));
 
     if (playerMode === 'nxsha') {
-      startNxshaParallelDiscovery(activeMeta, initialDubRef.current, startIdx);
-    } else if (playerMode === 'omni') {
-      setCurrentServerIndex(startIdx);
-      setServers(
-        activeList.map((s) => ({
-          index: s.index,
-          code: s.id,
-          name: s.label,
-          status: 'checking',
-          state: 'PROCESSING',
-        }))
-      );
-
-      const omniCtrl = new AbortController();
-      serverAbortControllersRef.current.set(0, omniCtrl);
-      const allowHevc = canPlayHevcInBrowser();
-
-      void (async () => {
-        try {
-          const res = await fetch('/api/goat/race', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: omniCtrl.signal,
-            body: JSON.stringify({
-              tmdbId: String(activeMeta.id),
-              mediaType: activeMeta.mediaType,
-              season: activeMeta.mediaType === 'tv' ? currentSeason : 1,
-              episode: activeMeta.mediaType === 'tv' ? currentEpisode : 1,
-              title: activeMeta.title,
-              originalTitle: activeMeta.originalTitle || activeMeta.title,
-              year: activeMeta.year,
-              date: activeMeta.releaseDate,
-              lastAirDate: activeMeta.lastAirDate,
-              imdbId: activeMeta.imdbId,
-              dubCode: initialDubRef.current,
-              dubType: initialDubRef.current ? selectedDubTypeRef.current : '',
-              allowHevc,
-              startServerIdx: startIdx,
-            }),
-          });
-
-          if (!res.ok || !res.body) {
-            throw new Error('Omni race endpoint failed');
-          }
-
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-
-          const processEventLine = (line: string) => {
-            const trimmed = line.trim();
-            if (!trimmed || discoveryRunIdRef.current !== discoveryId) return;
-            let ev: any = null;
-            try {
-              ev = JSON.parse(trimmed);
-            } catch {
-              return;
-            }
-            if (!ev) return;
-
-            if (ev.type === 'subtitles' && Array.isArray(ev.subtitles) && ev.subtitles.length > 0) {
-              setSubtitles((prev) => normalizeSubtitleTracks(prev, ev.subtitles));
-              return;
-            }
-
-            if (ev.type === 'done') {
-              setServers((prev) =>
-                prev.map((s) =>
-                  s.status === 'checking' && s.index !== raceWinnerIndexRef.current
-                    ? { ...s, status: 'failed', state: 'FAILED' }
-                    : s
-                )
-              );
-              return;
-            }
-
-            if (ev.type !== 'result' || typeof ev.index !== 'number') return;
-
-            if (Array.isArray(ev.dubs) && ev.dubs.length > 0) {
-              setAvailableDubs((prev) => mergeAvailableDubs(prev, ev.dubs));
-            }
-            if (Array.isArray(ev.subtitles) && ev.subtitles.length > 0) {
-              setSubtitles((prev) => normalizeSubtitleTracks(prev, ev.subtitles));
-            }
-
-            const isPlayable = Boolean(ev.success && ev.link);
-            const normalizedPayload = {
-              success: isPlayable,
-              link: ev.link || null,
-              type: ev.typeName || 'hls',
-              links: Array.isArray(ev.links) ? ev.links : [],
-              sources: Array.isArray(ev.sources) ? ev.sources : [],
-              dubs: Array.isArray(ev.dubs) ? ev.dubs : [],
-              subtitles: Array.isArray(ev.subtitles) ? ev.subtitles : [],
-            };
-
-            if (isPlayable) {
-              const upstreamId = ev.upstreamId || ev.id;
-              const dubForSrv =
-                ev.index === 0 ||
-                upstreamId.startsWith('source-') ||
-                upstreamId.startsWith('bingr') ||
-                upstreamId === 'orion' ||
-                upstreamId === 'vegamovies'
-                  ? initialDubRef.current
-                  : '';
-              const cacheKey = getServerResolveCacheKey(ev.id, activeMeta, dubForSrv);
-              resolvedServerPayloadCacheRef.current.set(cacheKey, normalizedPayload);
-              if (dubForSrv !== '') {
-                resolvedServerPayloadCacheRef.current.set(
-                  getServerResolveCacheKey(ev.id, activeMeta, ''),
-                  normalizedPayload
-                );
-              }
-            }
-
-            const decision = selectFirstConnectedWinner(raceWinnerIndexRef.current, {
-              serverIndex: ev.index,
-              success: isPlayable,
-              link: ev.link || null,
-            });
-
-            if (decision.shouldClaimPlayback && isPlayable) {
-              raceWinnerIndexRef.current = ev.index;
-              const activeRunId = probeRunIdRef.current;
-              const advanceFromWinner = () => {
-                if (probeRunIdRef.current !== activeRunId) return;
-                cleanupMediaEngines();
-                updateServerStatus(ev.index, 'failed');
-                setServers((prev) => {
-                  const nextReady =
-                    prev.find(
-                      (s, idx) =>
-                        idx !== ev.index &&
-                        s.status === 'available' &&
-                        s.state !== 'FAILED'
-                    ) ||
-                    prev.find(
-                      (s, idx) => idx !== ev.index && s.status !== 'failed' && s.state !== 'FAILED'
-                    );
-                  if (nextReady) {
-                    raceWinnerIndexRef.current = nextReady.index;
-                    window.setTimeout(() => {
-                      void probeServerAtIndex(
-                        nextReady.index,
-                        activeRunId,
-                        metadataRef.current || activeMeta,
-                        initialDubRef.current
-                      );
-                    }, 25);
-                  }
-                  return prev;
-                });
-              };
-              attachResolvedStreamData(
-                ev.index,
-                activeRunId,
-                metadataRef.current || activeMeta,
-                initialDubRef.current,
-                normalizedPayload,
-                advanceFromWinner
-              );
-            } else {
-              setServers((prev) =>
-                prev.map((s, i) => {
-                  if (i !== ev.index || i === raceWinnerIndexRef.current) return s;
-                  return isPlayable
-                    ? { ...s, status: 'available', state: 'AVAILABLE' }
-                    : { ...s, status: 'failed', state: 'FAILED' };
-                })
-              );
-            }
-          };
-
-          while (true) {
-            const { value, done } = await reader.read();
-            if (discoveryRunIdRef.current !== discoveryId) break;
-            if (value) {
-              buffer += decoder.decode(value, { stream: !done });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-              for (const line of lines) {
-                processEventLine(line);
-              }
-            }
-            if (done) {
-              if (buffer.trim()) processEventLine(buffer);
-              break;
-            }
-          }
-        } catch {
-          if (discoveryRunIdRef.current !== discoveryId || omniCtrl.signal.aborted) return;
-          setServers((prev) =>
-            prev.map((s) =>
-              s.status === 'checking' && s.index !== raceWinnerIndexRef.current
-                ? { ...s, status: 'failed', state: 'FAILED' }
-                : s
-            )
-          );
-        }
-      })();
+      startNxshaParallelDiscovery(metadata, initialDubRef.current, startIdx);
     } else {
-      setCurrentServerIndex(startIdx);
       setServers(
         activeList.map((s) => ({
           index: s.index,
           code: s.id,
           name: s.label,
           status: 'checking',
-          state: 'PROCESSING',
+          state: 'PENDING',
         }))
       );
-
-      const allowHevc = canPlayHevcInBrowser();
-      const orderedServers = orderServersForParallelRace(activeList, startIdx);
-
-      for (const srv of orderedServers) {
-        const ctrl = new AbortController();
-        serverAbortControllersRef.current.set(srv.index, ctrl);
-        const dubCodeForServer =
-          srv.index === 0 ||
-          srv.id.startsWith('source-') ||
-          srv.id.startsWith('bingr') ||
-          srv.id === 'orion' ||
-          srv.id === 'vegamovies'
-            ? initialDubRef.current
-            : '';
-        const cacheKey = getServerResolveCacheKey(srv.id, activeMeta, dubCodeForServer);
-
-        void (async () => {
-          try {
-            const res = await fetch('/api/stream/resolve', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              signal: ctrl.signal,
-              body: JSON.stringify({
-                tmdbId: String(activeMeta.id),
-                mediaType: activeMeta.mediaType,
-                season: activeMeta.mediaType === 'tv' ? currentSeason : 1,
-                episode: activeMeta.mediaType === 'tv' ? currentEpisode : 1,
-                title: activeMeta.title,
-                originalTitle: activeMeta.originalTitle || activeMeta.title,
-                year: activeMeta.year,
-                date: activeMeta.releaseDate,
-                lastAirDate: activeMeta.lastAirDate,
-                imdbId: activeMeta.imdbId,
-                dubCode: dubCodeForServer,
-                dubType: dubCodeForServer ? selectedDubTypeRef.current : '',
-                preferredServer: srv.id,
-                strictSingleServer: true,
-                allowHevc,
-              }),
-            });
-
-            if (discoveryRunIdRef.current !== discoveryId) return;
-            const data = await res.json().catch(() => null);
-            if (discoveryRunIdRef.current !== discoveryId) return;
-
-            if (Array.isArray(data?.dubs) && data.dubs.length > 0) {
-              setAvailableDubs((prev) => mergeAvailableDubs(prev, data.dubs));
-            }
-            if (Array.isArray(data?.subtitles) && data.subtitles.length > 0) {
-              setSubtitles((prev) => normalizeSubtitleTracks(prev, data.subtitles));
-            }
-
-            const isPlayable = Boolean(res.ok && data?.success && data?.link);
-            if (isPlayable) {
-              resolvedServerPayloadCacheRef.current.set(cacheKey, data);
-            }
-
-            const decision = selectFirstConnectedWinner(raceWinnerIndexRef.current, {
-              serverIndex: srv.index,
-              success: isPlayable,
-              link: data?.link || null,
-            });
-
-            if (decision.shouldClaimPlayback && isPlayable) {
-              raceWinnerIndexRef.current = srv.index;
-              const activeRunId = probeRunIdRef.current;
-              const advanceFromWinner = () => {
-                if (probeRunIdRef.current !== activeRunId) return;
-                cleanupMediaEngines();
-                updateServerStatus(srv.index, 'failed');
-                setServers((prev) => {
-                  const nextReady =
-                    prev.find(
-                      (s, idx) =>
-                        idx !== srv.index &&
-                        s.status === 'available' &&
-                        s.state !== 'FAILED'
-                    ) ||
-                    prev.find(
-                      (s, idx) => idx !== srv.index && s.status !== 'failed' && s.state !== 'FAILED'
-                    );
-                  if (nextReady) {
-                    raceWinnerIndexRef.current = nextReady.index;
-                    window.setTimeout(() => {
-                      void probeServerAtIndex(
-                        nextReady.index,
-                        activeRunId,
-                        metadataRef.current || activeMeta,
-                        initialDubRef.current
-                      );
-                    }, 25);
-                  }
-                  return prev;
-                });
-              };
-              attachResolvedStreamData(
-                srv.index,
-                activeRunId,
-                metadataRef.current || activeMeta,
-                initialDubRef.current,
-                data,
-                advanceFromWinner
-              );
-            } else {
-              setServers((prev) =>
-                prev.map((s, i) => {
-                  if (i !== srv.index) return s;
-                  if (i === raceWinnerIndexRef.current) return s;
-                  return isPlayable
-                    ? { ...s, status: 'available', state: 'AVAILABLE' }
-                    : { ...s, status: 'failed', state: 'FAILED' };
-                })
-              );
-            }
-          } catch {
-            if (discoveryRunIdRef.current !== discoveryId || ctrl.signal.aborted) return;
-            setServers((prev) =>
-              prev.map((s, i) => {
-                if (i !== srv.index || i === raceWinnerIndexRef.current) return s;
-                return { ...s, status: 'failed', state: 'FAILED' };
-              })
-            );
-          }
-        })();
-      }
+      void probeServerAtIndex(startIdx, runId, metadata, initialDubRef.current, false);
     }
 
     // Always fetch Orion's available dubs list in background when starting on non-Orion or in NXSHA mode
-    if (playerMode !== 'omni' && (startIdx !== 0 || playerMode === 'nxsha')) {
+    if (startIdx !== 0 || playerMode === 'nxsha') {
       fetch('/api/stream/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          tmdbId: String(activeMeta.id),
-          mediaType: activeMeta.mediaType,
-          season: activeMeta.mediaType === 'tv' ? currentSeason : 1,
-          episode: activeMeta.mediaType === 'tv' ? currentEpisode : 1,
-          title: activeMeta.title,
-          year: activeMeta.year,
-          date: activeMeta.releaseDate,
-          lastAirDate: activeMeta.lastAirDate,
-          imdbId: activeMeta.imdbId,
+          tmdbId: String(metadata.id),
+          mediaType: metadata.mediaType,
+          season: metadata.mediaType === 'tv' ? currentSeason : 1,
+          episode: metadata.mediaType === 'tv' ? currentEpisode : 1,
+          title: metadata.title,
+          year: metadata.year,
+          date: metadata.releaseDate,
+          lastAirDate: metadata.lastAirDate,
+          imdbId: metadata.imdbId,
           preferredServer: 'orion',
           strictSingleServer: true,
           allowHevc: true,
@@ -2622,11 +2075,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
 
     return () => {
       probeRunIdRef.current++;
-      discoveryRunIdRef.current++;
-      for (const ctrl of serverAbortControllersRef.current.values()) {
-        ctrl.abort();
-      }
-      serverAbortControllersRef.current.clear();
       for (const ctrl of nxshaProviderControllersRef.current.values()) {
         ctrl.abort();
       }
@@ -2637,19 +2085,13 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       }
     };
   }, [
-    attachResolvedStreamData,
-    buildInstantMetadata,
-    cleanupMediaEngines,
-    currentEpisode,
+    metadata,
     currentSeason,
-    getServerResolveCacheKey,
+    currentEpisode,
     initialServer,
     playerMode,
     probeServerAtIndex,
-    raceMediaId,
-    raceMediaType,
     startNxshaParallelDiscovery,
-    updateServerStatus,
   ]);
 
   // Synchronize external Dub Audio stream (from Orion /api/stream/mpd-audio) whenever selectedDub differs from the loaded video's audio
@@ -3001,23 +2443,16 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
         return;
       }
 
-      // ZXCSTREAM / OVER POWER / BINGR manual selection (instant 0ms switch if already resolved in parallel)
+      // ZXCSTREAM / OVER POWER manual selection (allows switching or retrying any server)
       const targetSrv = servers[idx];
       if (!targetSrv) return;
       if (idx === currentServerIndex && canPlay) return;
 
-      raceWinnerIndexRef.current = idx;
       const runId = ++probeRunIdRef.current;
       hasEstablishedPlaybackRef.current = false;
       setServers((prev) =>
         prev.map((s, i) => {
-          if (i === idx) {
-            return {
-              ...s,
-              status: s.status === 'available' ? 'connecting' : 'checking',
-              state: 'SELECTED',
-            };
-          }
+          if (i === idx) return { ...s, status: 'checking', state: 'SELECTED' };
           if (s.status === 'failed' || s.state === 'FAILED') return s;
           return {
             ...s,
@@ -3587,28 +3022,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
       if (loadedStreamDubRef.current !== '' && nxshaDefaultSourceRef.current) {
         switchNxshaSourceInPlace(nxshaDefaultSourceRef.current, '');
       }
-      return;
-    }
-
-    if ((playerMode === 'bingr' || playerMode === 'omni') && metadata) {
-      const activeSrvCode = servers[currentServerIndex]?.code || '';
-      if (
-        playerMode === 'bingr' ||
-        activeSrvCode.startsWith('bingr') ||
-        activeSrvCode.startsWith('source-') ||
-        activeSrvCode === 'zxc-orion' ||
-        activeSrvCode === 'zxc-vegamovies'
-      ) {
-        cleanupDubAudioEngine();
-        const runId = ++probeRunIdRef.current;
-        void probeServerAtIndex(
-          currentServerIndex,
-          runId,
-          metadata,
-          isOrig ? '' : cleanCode,
-          true
-        );
-      }
     }
   };
 
@@ -4010,7 +3423,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
         ref={videoRef}
         data-testid="zxc-video-element"
         playsInline
-        preload="auto"
         onClick={(e) => {
           e.stopPropagation();
           wakeControls();
@@ -4641,27 +4053,6 @@ export const CustomPlayerView: React.FC<CustomPlayerViewProps> = ({
         onSelectDub={handleSelectDub}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}
-        onOpenDownload={() => setDownloadModalOpen(true)}
-      />
-
-      <PlayerDownloadModal
-        open={downloadModalOpen}
-        onClose={() => setDownloadModalOpen(false)}
-        mediaType={activeMediaType}
-        tmdbId={String(tmdbId)}
-        season={currentSeason}
-        episode={currentEpisode}
-        title={metadata?.title || undefined}
-        year={metadata?.year || undefined}
-        currentPlaybackSource={activeServerList[currentServerIndex]?.label}
-        playbackUrl={videoRef.current?.currentSrc || ''}
-        availableDubs={availableDubs.map((d) => ({
-          code: d.lang,
-          name: d.name,
-          type: String(d.type || 'dub'),
-        }))}
-        audioTracks={audioTracks}
-        qualities={qualities}
       />
 
       {subtitleModalOpen && (

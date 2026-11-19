@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  Eclipse,
   ArrowRight,
   SlidersVertical,
   Film,
@@ -23,7 +22,6 @@ import {
   buildEmbedIframeCode,
 } from '../utils/urlBuilder';
 import { CustomPlayerView } from './CustomPlayerView';
-import { GoatServerSvg } from './PlayerIconsAndTypes';
 import { AnimePlayer } from '../anime/AnimePlayer';
 import { AnnouncementModal } from './AnnouncementModal';
 
@@ -38,8 +36,6 @@ export const ANIME_PRESETS = [
 export interface HomePageProps {
   announcementOpen: boolean;
   onDismissAnnouncement: () => void;
-  onNavigateDevelopers?: () => void;
-  onNavigateDownload: (mediaType: MediaType, tmdbId: string) => void;
   onOpenStandalonePlayer: (
     playerMode: PlayerMode,
     mediaType: MediaType,
@@ -52,11 +48,9 @@ export interface HomePageProps {
 export const HomePage: React.FC<HomePageProps> = ({
   announcementOpen,
   onDismissAnnouncement,
-  onNavigateDevelopers,
-  onNavigateDownload,
   onOpenStandalonePlayer,
 }) => {
-  const [playerMode, setPlayerMode] = useState<PlayerMode>('omni');
+  const [playerMode, setPlayerMode] = useState<PlayerMode>('custom');
   const [mediaType, setMediaType] = useState<MediaType>('movie');
   const [tmdbId, setTmdbId] = useState<string>('128');
   const [season, setSeason] = useState<string>('1');
@@ -145,9 +139,7 @@ export const HomePage: React.FC<HomePageProps> = ({
 
   // Dynamic Brand Identity & Restrained Lighting per Player
   const brandTitle =
-    playerMode === 'omni'
-      ? 'GOAT SERVER'
-      : playerMode === 'bingr'
+    playerMode === 'bingr'
       ? 'BINGR CRACK'
       : playerMode === 'overpower'
       ? 'OVER POWER'
@@ -158,9 +150,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'ZXCSTREAM';
 
   const lampRgba =
-    playerMode === 'omni'
-      ? 'rgba(16, 185, 129, 0.78)'
-      : playerMode === 'bingr'
+    playerMode === 'bingr'
       ? 'rgba(245, 158, 11, 0.75)'
       : playerMode === 'overpower'
       ? 'rgba(168, 85, 247, 0.7)'
@@ -171,9 +161,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'rgba(37, 99, 235, 0.7)';
 
   const lampGlowSoftClass =
-    playerMode === 'omni'
-      ? 'bg-emerald-500/10'
-      : playerMode === 'bingr'
+    playerMode === 'bingr'
       ? 'bg-amber-600/10'
       : playerMode === 'overpower'
       ? 'bg-purple-600/10'
@@ -184,9 +172,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'bg-blue-600/10';
 
   const lampBarClass =
-    playerMode === 'omni'
-      ? 'bg-emerald-500/75'
-      : playerMode === 'bingr'
+    playerMode === 'bingr'
       ? 'bg-amber-500/70'
       : playerMode === 'overpower'
       ? 'bg-purple-600/70'
@@ -197,9 +183,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       : 'bg-blue-600/70';
 
   const activeButtonClass =
-    playerMode === 'omni'
-      ? 'bg-emerald-600 text-white shadow-md scale-100'
-      : playerMode === 'bingr'
+    playerMode === 'bingr'
       ? 'bg-amber-600 text-white shadow-md scale-100'
       : playerMode === 'overpower'
       ? 'bg-purple-900 text-white shadow-md scale-100'
@@ -214,55 +198,9 @@ export const HomePage: React.FC<HomePageProps> = ({
       {/* Important Announcement Modal */}
       <AnnouncementModal open={announcementOpen} onDismiss={onDismissAnnouncement} />
 
-      {/* Top Endpoint Notification Banner */}
-      <div className="dark bg-zinc-900 px-4 py-3 text-zinc-50 border-b border-white/5 relative z-30">
-        <div className="flex flex-col justify-between gap-2 md:flex-row md:items-center max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Eclipse className="shrink-0 opacity-60 h-4 w-4" aria-hidden="true" />
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-1 md:gap-3 text-sm">
-              <p className="text-zinc-200 leading-snug">
-                Download endpoint &amp; Public Developer API now available:{' '}
-                <span className="font-mono text-zinc-100 break-words">
-                  {currentOrigin}/download/&#123;media_type&#125;/&#123;tmdbId&#125;
-                </span>
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 shrink-0">
-            <button
-              type="button"
-              onClick={() => {
-                if (onNavigateDevelopers) {
-                  onNavigateDevelopers();
-                } else {
-                  window.location.href = '/developers';
-                }
-              }}
-              data-testid="open-developer-api-btn"
-              className="group shrink-0 text-xs sm:text-sm font-semibold whitespace-nowrap inline-flex items-center gap-1.5 px-2.5 py-1 rounded bg-blue-600/20 border border-blue-500/30 text-blue-300 hover:bg-blue-600/30 hover:text-white transition cursor-pointer"
-            >
-              <Code className="h-3.5 w-3.5 text-blue-400" />
-              <span>Public Developer API</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => onNavigateDownload('movie', tmdbId.trim() || '128')}
-              data-testid="sample-download-link"
-              className="group shrink-0 text-sm font-medium whitespace-nowrap inline-flex items-center text-zinc-100 hover:text-blue-400 transition cursor-pointer"
-            >
-              <span>Sample Link</span>
-              <ArrowRight
-                className="ms-1 -mt-0.5 inline-flex opacity-60 transition-transform group-hover:translate-x-0.5 h-4 w-4"
-                aria-hidden="true"
-              />
-            </button>
-          </div>
-        </div>
-      </div>
-
       {/* Main Lamp Spotlight Section */}
       <div className="relative flex min-h-screen flex-col items-center justify-start overflow-hidden bg-zinc-950 w-full rounded-md z-0">
-        {/* Top Three-Player Switcher under Sample Link Banner */}
+        {/* Top Player Switcher */}
         <div className="z-20 absolute inset-x-0 top-0 flex justify-center items-center p-6">
           <div
             data-testid="top-player-switcher"
@@ -327,19 +265,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               }`}
             >
               BINGR CRACK
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPlayer('omni')}
-              data-testid="header-engine-omni"
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md transition-all duration-300 cursor-pointer font-semibold ${
-                playerMode === 'omni'
-                  ? 'bg-emerald-600 text-white shadow-xs'
-                  : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              <GoatServerSvg className="w-4 h-4 text-emerald-200" />
-              <span>GOAT</span>
             </button>
           </div>
         </div>
@@ -406,9 +331,7 @@ export const HomePage: React.FC<HomePageProps> = ({
             </h1>
 
             <p className="text-zinc-400 text-xs lg:text-base max-w-lg mt-2">
-              {playerMode === 'omni'
-                ? 'Unified Parallel Engine combining BINGR CRACK, OVER POWER, ZXCSTREAM & NXSHA — all servers race simultaneously and whichever connects first plays instantly'
-                : playerMode === 'bingr'
+              {playerMode === 'bingr'
                 ? 'Dedicated Bingr Crack Cinema Engine for Movies & TV Shows with 100% Ad-Free playback and instant stream resolution'
                 : playerMode === 'anime'
                 ? 'Dedicated anime streaming player with TMDB anime verification and multi-audio Sub & Dub playback'
@@ -489,19 +412,6 @@ export const HomePage: React.FC<HomePageProps> = ({
               >
                 <Zap className="w-4 h-4 text-amber-300" />
                 <span>BINGR CRACK</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSelectPlayer('omni')}
-                data-testid="toggle-omni-player"
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-medium text-xs lg:text-sm cursor-pointer transition-all duration-300 ${
-                  playerMode === 'omni'
-                    ? 'bg-emerald-600 text-white shadow-md scale-100'
-                    : 'text-zinc-400 hover:text-zinc-50'
-                }`}
-              >
-                <GoatServerSvg className="w-4 h-4 text-emerald-200" />
-                <span>GOAT SERVER</span>
               </button>
             </div>
 
@@ -808,17 +718,11 @@ export const HomePage: React.FC<HomePageProps> = ({
           )}
 
           {/* QUERY PARAMETERS Documentation Section */}
-          {(playerMode === 'custom' ||
-            playerMode === 'nxsha' ||
-            playerMode === 'overpower' ||
-            playerMode === 'bingr' ||
-            playerMode === 'omni') && (
+          {(playerMode === 'custom' || playerMode === 'nxsha' || playerMode === 'overpower' || playerMode === 'bingr') && (
             <div className="mt-10 w-full max-w-4xl text-left">
               <div className="space-y-5">
                 <h2 className="text-sm font-mono tracking-wider text-zinc-400 uppercase mb-6">
-                  {playerMode === 'omni'
-                    ? 'GOAT SERVER Unified Race Engine & Parameters'
-                    : playerMode === 'bingr'
+                  {playerMode === 'bingr'
                     ? 'BINGR CRACK Engine & Parameters'
                     : playerMode === 'overpower'
                     ? 'OVER POWER Engine & Parameters'
@@ -826,26 +730,6 @@ export const HomePage: React.FC<HomePageProps> = ({
                     ? 'NXSHA Engine & Parameters'
                     : 'Query Parameters'}
                 </h2>
-
-                {playerMode === 'omni' && (
-                  <div className="space-y-4 text-sm border-b border-zinc-800 pb-5">
-                    <div className="font-mono text-zinc-50 text-base flex items-center gap-2">
-                      <GoatServerSvg className="w-4 h-4 text-emerald-400" />
-                      <span>GOAT SERVER Unified Parallel Race Endpoints</span>
-                    </div>
-                    <p className="text-zinc-400 leading-relaxed">
-                      Combines every server from BINGR CRACK, OVER POWER, ZXCSTREAM, and NXSHA into one parallel streaming race. All 63 servers launch simultaneously and the very first server to respond plays instantaneously, while the remaining available servers stay cached for 0ms switching.
-                    </p>
-                    <div>
-                      <div className="font-mono text-xs uppercase tracking-wider text-zinc-400 mb-2">
-                        Usage
-                      </div>
-                      <pre className="bg-zinc-900 border border-zinc-800 rounded-md p-3 text-xs font-mono overflow-x-auto text-zinc-200">
-                        {`/goat/movie/1381071\n/goat/tv/1396/1/1\n/omni/movie/1381071`}
-                      </pre>
-                    </div>
-                  </div>
-                )}
 
                 {playerMode === 'bingr' && (
                   <div className="space-y-4 text-sm border-b border-zinc-800 pb-5">

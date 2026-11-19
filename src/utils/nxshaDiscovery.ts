@@ -62,13 +62,11 @@ export function isDeadNxshaSourceUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return true;
   const lower = url.trim().toLowerCase();
   if (!lower) return true;
-  const isGenericNxStreamHub =
-    lower.includes('nxstreamhub.workers.dev') &&
-    !lower.includes('catflix.nxstreamhub.workers.dev');
   if (
-    isGenericNxStreamHub ||
+    lower.includes('nxstreamhub.workers.dev') ||
     lower.includes('worker-inosuke.workers.dev') ||
     lower.includes('silent-math-8425.itsnitrox.tech') ||
+    lower.includes('wts.itsnitrox.tech/pitro') ||
     lower.includes('wts.itsnitrox.tech/litro') ||
     lower.includes('husvu445bey.com') ||
     lower.includes('kkphimplayer') ||
@@ -154,11 +152,7 @@ export function isTrustedNxshaMediaUrl(rawUrl: string): boolean {
   if (!trimmed) return false;
 
   // Handle local stream/nxsha proxy wrapper by validating the inner target URL
-  if (
-    trimmed.startsWith('/api/nxsha/proxy') ||
-    trimmed.startsWith('/api/stream/proxy') ||
-    trimmed.startsWith('/api/stream/bingr-h264')
-  ) {
+  if (trimmed.startsWith('/api/nxsha/proxy') || trimmed.startsWith('/api/stream/proxy')) {
     try {
       const parsedProxy = new URL(trimmed, 'https://nxsha.space');
       const innerUrl = parsedProxy.searchParams.get('url') || '';

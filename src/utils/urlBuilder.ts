@@ -1,4 +1,4 @@
-export type PlayerMode = 'custom' | 'builtin' | 'nxsha' | 'anime' | 'overpower' | 'bingr' | 'omni';
+export type PlayerMode = 'custom' | 'builtin' | 'nxsha' | 'anime' | 'overpower' | 'bingr';
 export type MediaType = 'movie' | 'tv';
 
 export interface PlayerUrlOptions {
@@ -37,20 +37,12 @@ export type AppRoute =
       episode: number;
     }
   | {
-      page: 'download';
-      mediaType: MediaType;
-      tmdbId: string;
-      season?: number;
-      episode?: number;
-    }
-  | {
       page: 'anime';
       tmdbId: string;
       season: number;
       episode: number;
       mediaType?: 'movie' | 'tv';
-    }
-  | { page: 'developers' };
+    };
 
 export interface RawOrionDub {
   type?: number;
@@ -136,7 +128,7 @@ export const STREAM_SERVERS = [
   },
 ] as const;
 
-export const USER_DEPLOYMENT_ORIGIN = 'https://zxcstream-mirror.vercel.app';
+export const USER_DEPLOYMENT_ORIGIN = 'https://zxcstream-mirror.ai.studio';
 
 export function getDefaultOrigin(): string {
   return USER_DEPLOYMENT_ORIGIN;
@@ -144,7 +136,7 @@ export function getDefaultOrigin(): string {
 
 /**
  * Builds the canonical display URL shown in the ZXC[STREAM] copy bar.
- * Uses the user's mirror deployment domain (https://zxcstream-mirror.vercel.app)
+ * Uses the user's mirror deployment domain (https://zxcstream-mirror.ai.studio)
  * `${origin}/${playerMode === 'custom' ? 'player' : 'embed'}/${mediaType}/${id}`
  * and appends `/${season}/${episode}` for tv series.
  */
@@ -175,9 +167,7 @@ export function buildPlayerUrl(options: PlayerUrlOptions): string {
   }
 
   const endpoint =
-    options.playerMode === 'omni'
-      ? 'goat'
-      : options.playerMode === 'bingr'
+    options.playerMode === 'bingr'
       ? 'bingr'
       : options.playerMode === 'overpower'
       ? 'overpower'
@@ -214,63 +204,6 @@ export function buildPlayerUrl(options: PlayerUrlOptions): string {
   }
 
   return path;
-}
-
-export function buildDownloadUrl(
-  mediaType: MediaType,
-  tmdbId: string,
-  baseOrigin?: string,
-  season?: number | string,
-  episode?: number | string
-): string {
-  const origin = (baseOrigin ?? getDefaultOrigin()).replace(/\/+$/, '');
-  const cleanId = encodeURIComponent(tmdbId.trim());
-  if (mediaType === 'tv' && season !== undefined && episode !== undefined) {
-    const s = encodeURIComponent(String(season).trim() || '1');
-    const ep = encodeURIComponent(String(episode).trim() || '1');
-    return `${origin}/download/tv/${cleanId}/${s}/${ep}`;
-  }
-  return `${origin}/download/${mediaType}/${cleanId}`;
-}
-
-export function buildSimpleApiJsonUrl(
-  mediaType: MediaType,
-  tmdbId: string,
-  season: number | string = 1,
-  episode: number | string = 1,
-  baseOrigin?: string
-): string {
-  const origin = (baseOrigin ?? getDefaultOrigin()).replace(/\/+$/, '');
-  const cleanId = encodeURIComponent(tmdbId.trim() || (mediaType === 'tv' ? '1396' : '128'));
-  if (mediaType === 'tv') {
-    const s = encodeURIComponent(String(season).trim() || '1');
-    const ep = encodeURIComponent(String(episode).trim() || '1');
-    return `${origin}/api/v1/download/tv/${cleanId}/${s}/${ep}`;
-  }
-  return `${origin}/api/v1/download/movie/${cleanId}`;
-}
-
-export function buildSimpleDirectMp4Url(
-  mediaType: MediaType,
-  tmdbId: string,
-  options?: {
-    season?: number | string;
-    episode?: number | string;
-    lang?: string;
-    quality?: string;
-    baseOrigin?: string;
-  }
-): string {
-  const origin = (options?.baseOrigin ?? getDefaultOrigin()).replace(/\/+$/, '');
-  const cleanId = encodeURIComponent(tmdbId.trim() || (mediaType === 'tv' ? '1396' : '128'));
-  const lang = encodeURIComponent((options?.lang || 'hi').trim().toLowerCase());
-  const quality = encodeURIComponent((options?.quality || '1080p').trim().toLowerCase());
-  if (mediaType === 'tv') {
-    const s = encodeURIComponent(String(options?.season ?? 1).trim() || '1');
-    const ep = encodeURIComponent(String(options?.episode ?? 1).trim() || '1');
-    return `${origin}/api/v1/dl/tv/${cleanId}/${s}/${ep}?lang=${lang}&quality=${quality}`;
-  }
-  return `${origin}/api/v1/dl/movie/${cleanId}?lang=${lang}&quality=${quality}`;
 }
 
 export function buildEmbedIframeCode(
@@ -561,51 +494,6 @@ export const NXSHA_SERVERS = [
   { index: 41, id: 'bingr', label: 'Bingr Core (Ad-Free Master)' },
 ] as const;
 
-export interface OmniServerDefinition {
-  index: number;
-  id: string;
-  upstreamId: string;
-  resolveEngine: 'stream' | 'nxsha';
-  engineTag: 'BINGR' | 'OVER POWER' | 'ZXCSTREAM' | 'NXSHA';
-  label: string;
-}
-
-const RAW_OMNI_SERVERS: Array<Omit<OmniServerDefinition, 'index'>> = [
-  ...BINGR_SERVERS.map((s) => ({
-    id: s.id,
-    upstreamId: s.id,
-    resolveEngine: 'stream' as const,
-    engineTag: 'BINGR' as const,
-    label: `Bingr · ${s.label}`,
-  })),
-  ...OVERPOWER_SERVERS.filter((s) => s.id.startsWith('source-')).map((s) => ({
-    id: s.id,
-    upstreamId: s.id,
-    resolveEngine: 'stream' as const,
-    engineTag: 'OVER POWER' as const,
-    label: `OP · ${s.label}`,
-  })),
-  ...PLAYER_SERVERS.map((s) => ({
-    id: `zxc-${s.id}`,
-    upstreamId: s.id,
-    resolveEngine: 'stream' as const,
-    engineTag: 'ZXCSTREAM' as const,
-    label: `ZXC · ${s.label}`,
-  })),
-  ...NXSHA_SERVERS.map((s) => ({
-    id: `nx-${s.id}`,
-    upstreamId: s.id,
-    resolveEngine: 'nxsha' as const,
-    engineTag: 'NXSHA' as const,
-    label: `NX · ${s.label}`,
-  })),
-];
-
-export const OMNI_SERVERS: ReadonlyArray<OmniServerDefinition> = RAW_OMNI_SERVERS.map((srv, idx) => ({
-  ...srv,
-  index: idx,
-}));
-
 export const PLAYER_HINTS = [
   'You can customize the subtitle size, color, and position in the settings.',
   'If the current server is slow or buffering, try switching to another server in the top-right corner.',
@@ -657,7 +545,7 @@ export function parsePlayerQueryParams(search: string): ParsedPlayerQuery {
   let server: number | undefined;
   if (rawServer !== null && rawServer.trim() !== '') {
     const parsed = Number.parseInt(rawServer, 10);
-    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 100) {
+    if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 50) {
       server = parsed;
     }
   }
@@ -902,49 +790,6 @@ export function parseAppRoute(pathname: string): AppRoute {
 
   const [first, second, third, fourth, fifth] = segments;
 
-  if (first === 'developers' || first === 'developer' || first === 'api-docs') {
-    return { page: 'developers' };
-  }
-
-  if (first === 'download' && (second === 'movie' || second === 'tv') && third) {
-    if (second === 'tv' && fourth) {
-      const season = Math.max(1, Number.parseInt(fourth, 10) || 1);
-      const episode = Math.max(1, Number.parseInt(fifth ?? '1', 10) || 1);
-      return {
-        page: 'download',
-        mediaType: 'tv',
-        tmdbId: third,
-        season,
-        episode,
-      };
-    }
-    return {
-      page: 'download',
-      mediaType: second,
-      tmdbId: third,
-    };
-  }
-
-  // Shorthand download route: /download/1396/1/1 (Series) or /download/128 (Movie)
-  if (first === 'download' && second && /^\d+$/.test(second)) {
-    if (third && /^\d+$/.test(third)) {
-      const season = Math.max(1, Number.parseInt(third, 10) || 1);
-      const episode = Math.max(1, Number.parseInt(fourth ?? '1', 10) || 1);
-      return {
-        page: 'download',
-        mediaType: 'tv',
-        tmdbId: second,
-        season,
-        episode,
-      };
-    }
-    return {
-      page: 'download',
-      mediaType: 'movie',
-      tmdbId: second,
-    };
-  }
-
   // Explicit Anime Route: /anime/:tmdbId/:season/:ep or /anime/movie/:tmdbId or /anime/:tmdbId
   if (first === 'anime' && second) {
     if ((second === 'movie' || second === 'tv') && third) {
@@ -1035,18 +880,9 @@ export function parseAppRoute(pathname: string): AppRoute {
     }
   }
 
-  // Standard Embed / Custom / NXSHA / OVER POWER / BINGR / GOAT (All-In-One Omni) Player Routes:
-  // /embed/movie/:id, /goat/movie/:id, /omni/movie/:id, /all/movie/:id, /allinone/movie/:id, etc.
+  // Standard Embed / Custom / NXSHA / OVER POWER / BINGR Player Routes: /embed/movie/:id or /embed/tv/:id/:s/:e
   if (
-    (first === 'player' ||
-      first === 'embed' ||
-      first === 'nxsha' ||
-      first === 'overpower' ||
-      first === 'bingr' ||
-      first === 'goat' ||
-      first === 'omni' ||
-      first === 'all' ||
-      first === 'allinone') &&
+    (first === 'player' || first === 'embed' || first === 'nxsha' || first === 'overpower' || first === 'bingr') &&
     (second === 'movie' || second === 'tv') &&
     third
   ) {
@@ -1055,9 +891,7 @@ export function parseAppRoute(pathname: string): AppRoute {
     return {
       page: 'player',
       playerMode:
-        first === 'goat' || first === 'omni' || first === 'all' || first === 'allinone'
-          ? 'omni'
-          : first === 'bingr'
+        first === 'bingr'
           ? 'bingr'
           : first === 'overpower'
           ? 'overpower'
@@ -2274,78 +2108,6 @@ export function normalizeSubtitleTracks(
   return result;
 }
 
-export interface ParallelRaceCandidateResult {
-  serverIndex: number;
-  success: boolean;
-  link?: string | null;
-}
 
-export interface ParallelRaceDecision {
-  shouldClaimPlayback: boolean;
-  nextWinnerIndex: number | null;
-  status: 'connecting' | 'available' | 'failed';
-  state: 'SELECTED' | 'AVAILABLE' | 'FAILED';
-}
 
-/**
- * Deterministically evaluates an incoming parallel server resolution result:
- * - The first server to resolve a valid playable stream (`success && Boolean(link)`)
- *   when `currentWinnerIndex === null` immediately claims playback (`shouldClaimPlayback: true`).
- * - Any subsequent server that resolves a valid playable stream is marked `'available'` (`'AVAILABLE'`)
- *   and cached for zero-latency switching without interrupting the active winner.
- * - Any server that returns no valid link is marked `'failed'` (`'FAILED'`).
- */
-export function selectFirstConnectedWinner(
-  currentWinnerIndex: number | null,
-  candidate: ParallelRaceCandidateResult
-): ParallelRaceDecision {
-  const isValid = Boolean(
-    candidate.success && typeof candidate.link === 'string' && candidate.link.trim().length > 0
-  );
-  if (!isValid) {
-    return {
-      shouldClaimPlayback: false,
-      nextWinnerIndex: currentWinnerIndex,
-      status: 'failed',
-      state: 'FAILED',
-    };
-  }
 
-  if (currentWinnerIndex === null) {
-    return {
-      shouldClaimPlayback: true,
-      nextWinnerIndex: candidate.serverIndex,
-      status: 'connecting',
-      state: 'SELECTED',
-    };
-  }
-
-  if (currentWinnerIndex === candidate.serverIndex) {
-    return {
-      shouldClaimPlayback: false,
-      nextWinnerIndex: currentWinnerIndex,
-      status: 'available',
-      state: 'SELECTED',
-    };
-  }
-
-  return {
-    shouldClaimPlayback: false,
-    nextWinnerIndex: currentWinnerIndex,
-    status: 'available',
-    state: 'AVAILABLE',
-  };
-}
-
-/**
- * Orders a server list so the preferred `startIdx` is launched first in the parallel race,
- * followed by all remaining servers in index order.
- */
-export function orderServersForParallelRace<T extends { index: number }>(
-  servers: readonly T[],
-  startIdx: number
-): T[] {
-  if (!servers.length) return [];
-  const clamped = Math.max(0, Math.min(servers.length - 1, startIdx));
-  return [servers[clamped], ...servers.filter((_, idx) => idx !== clamped)];
-}

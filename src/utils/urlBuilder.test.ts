@@ -2,9 +2,6 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   buildPlayerUrl,
-  buildDownloadUrl,
-  buildSimpleApiJsonUrl,
-  buildSimpleDirectMp4Url,
   formatRuntime,
   calculateStarRating,
   formatVideoTime,
@@ -28,12 +25,6 @@ import {
   mpeg2Crc32,
   formatPlayerTime,
   BINGR_SERVERS,
-  OVERPOWER_SERVERS,
-  PLAYER_SERVERS,
-  NXSHA_SERVERS,
-  OMNI_SERVERS,
-  selectFirstConnectedWinner,
-  orderServersForParallelRace,
 } from './urlBuilder.ts';
 import {
   getEpisodeTimingMetadata,
@@ -41,7 +32,6 @@ import {
   getSeriesImdbId,
   getMediaByTmdbId,
 } from '../data/tmdbCatalog.ts';
-import { buildDownloadProxyUrl } from '../services/downloadEngineTypes.ts';
 
 describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
   it('builds Custom Player and Built-in Player URLs for movies and series', () => {
@@ -112,59 +102,24 @@ describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
 
     assert.equal(
       buildPlayerUrl({
-        baseOrigin: 'https://zxcstream-mirror.vercel.app',
+        baseOrigin: 'https://zxcstream-mirror.ai.studio',
         playerMode: 'anime',
         mediaType: 'tv',
         tmdbId: '85937',
         season: '1',
         episode: '1',
       }),
-      'https://zxcstream-mirror.vercel.app/anime/tv/85937/1/1'
+      'https://zxcstream-mirror.ai.studio/anime/tv/85937/1/1'
     );
 
     assert.equal(
       buildPlayerUrl({
-        baseOrigin: 'https://zxcstream-mirror.vercel.app',
+        baseOrigin: 'https://zxcstream-mirror.ai.studio',
         playerMode: 'anime',
         mediaType: 'movie',
         tmdbId: '12',
       }),
-      'https://zxcstream-mirror.vercel.app/anime/movie/12'
-    );
-  });
-
-  it('builds Download endpoint URLs accurately', () => {
-    assert.equal(
-      buildDownloadUrl('movie', '128'),
-      'https://zxcstream-mirror.vercel.app/download/movie/128'
-    );
-    assert.equal(
-      buildDownloadUrl('tv', '66732'),
-      'https://zxcstream-mirror.vercel.app/download/tv/66732'
-    );
-    assert.equal(
-      buildDownloadUrl('tv', '1396', undefined, 1, 1),
-      'https://zxcstream-mirror.vercel.app/download/tv/1396/1/1'
-    );
-    assert.equal(
-      buildSimpleApiJsonUrl('tv', '1396', 1, 1),
-      'https://zxcstream-mirror.vercel.app/api/v1/download/tv/1396/1/1'
-    );
-    assert.equal(
-      buildSimpleApiJsonUrl('movie', '128'),
-      'https://zxcstream-mirror.vercel.app/api/v1/download/movie/128'
-    );
-    assert.equal(
-      buildSimpleDirectMp4Url('tv', '1396', { season: 1, episode: 1, lang: 'hi', quality: '1080p' }),
-      'https://zxcstream-mirror.vercel.app/api/v1/dl/tv/1396/1/1?lang=hi&quality=1080p'
-    );
-    assert.equal(
-      buildSimpleDirectMp4Url('movie', '128', { lang: 'hi', quality: '1080p' }),
-      'https://zxcstream-mirror.vercel.app/api/v1/dl/movie/128?lang=hi&quality=1080p'
-    );
-    assert.equal(
-      buildDownloadUrl('movie', '128', 'https://custom-domain.com'),
-      'https://custom-domain.com/download/movie/128'
+      'https://zxcstream-mirror.ai.studio/anime/movie/12'
     );
   });
 
@@ -208,27 +163,8 @@ describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
     assert.equal(qAutoplayOff.introEnd, 60);
 
     assert.deepEqual(parseAppRoute('/'), { page: 'home' });
-    assert.deepEqual(parseAppRoute('/developers'), { page: 'developers' });
-    assert.deepEqual(parseAppRoute('/api-docs'), { page: 'developers' });
-    assert.deepEqual(parseAppRoute('/download/movie/128'), {
-      page: 'download',
-      mediaType: 'movie',
-      tmdbId: '128',
-    });
-    assert.deepEqual(parseAppRoute('/download/tv/1396/1/1'), {
-      page: 'download',
-      mediaType: 'tv',
-      tmdbId: '1396',
-      season: 1,
-      episode: 1,
-    });
-    assert.deepEqual(parseAppRoute('/download/1396/1/1'), {
-      page: 'download',
-      mediaType: 'tv',
-      tmdbId: '1396',
-      season: 1,
-      episode: 1,
-    });
+    assert.deepEqual(parseAppRoute('/download/movie/128'), { page: 'home' });
+    assert.deepEqual(parseAppRoute('/developers'), { page: 'home' });
     assert.deepEqual(parseAppRoute('/player/tv/66732/1/2'), {
       page: 'player',
       playerMode: 'custom',
@@ -970,46 +906,8 @@ describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
     assert.equal(secondScan.selectedLang, 'hi');
   });
 
-  it('builds authentic MP4 file download and subtitle endpoints without hash links or cookie traps', () => {
-    // 1. Mononoke Movie Hindi 1080p download URL
-    const movieDlUrl = buildDownloadProxyUrl({
-      mediaType: 'movie',
-      tmdbId: '128',
-      lang: 'hi',
-      quality: '1080p',
-      title: 'Princess Mononoke',
-    });
-    assert.ok(movieDlUrl.startsWith('/api/download/file?'));
-    assert.ok(movieDlUrl.includes('lang=hi'));
-    assert.ok(movieDlUrl.includes('quality=1080p'));
-    assert.ok(movieDlUrl.includes('mediaType=movie'));
-
-    // 2. TV Stranger Things S1E1 Hindi 720p download URL
-    const tvDlUrl = buildDownloadProxyUrl({
-      mediaType: 'tv',
-      tmdbId: '66732',
-      season: 1,
-      episode: 1,
-      lang: 'hi',
-      quality: '720p',
-      title: 'Stranger Things',
-    });
-    assert.ok(tvDlUrl.startsWith('/api/download/file?'));
-    assert.ok(tvDlUrl.includes('lang=hi'));
-    assert.ok(tvDlUrl.includes('quality=720p'));
-    assert.ok(tvDlUrl.includes('season=1'));
-    assert.ok(tvDlUrl.includes('episode=1'));
-
-    // 3. Catalog downloads must NEVER contain hash links (#dl-)
+  it('ensures catalog subtitle endpoints do not contain hash traps', () => {
     const mononoke = getMediaByTmdbId('movie', '128');
-    assert.ok(mononoke.downloads.length > 0);
-    for (const dl of mononoke.downloads) {
-      assert.ok(!dl.url.startsWith('#'), `Download url must not be a hash: ${dl.url}`);
-      assert.ok(dl.url.includes('/api/download/file'), `Download url must hit endpoint: ${dl.url}`);
-      assert.equal(dl.format, 'mp4');
-    }
-
-    // 4. Subtitles must NEVER contain hash links (#download-)
     for (const sub of mononoke.subtitles) {
       assert.ok(!sub.url.startsWith('#'), `Subtitle url must not be a hash: ${sub.url}`);
       assert.ok(sub.url.includes('/api/download/subtitle'), `Subtitle url must hit endpoint: ${sub.url}`);
@@ -1064,12 +962,12 @@ describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
   it('builds and parses Bingr Crack routes and exposes all 7 Bingr server nodes', () => {
     assert.equal(
       buildPlayerUrl({
-        baseOrigin: 'https://zxcstream-mirror.vercel.app',
+        baseOrigin: 'https://zxcstream-mirror.ai.studio',
         playerMode: 'bingr',
         mediaType: 'movie',
         tmdbId: '1381071',
       }),
-      'https://zxcstream-mirror.vercel.app/bingr/movie/1381071'
+      'https://zxcstream-mirror.ai.studio/bingr/movie/1381071'
     );
 
     assert.deepEqual(parseAppRoute('/bingr/movie/1381071'), {
@@ -1096,127 +994,4 @@ describe('ZXC[STREAM] URL Builder & Route Utilities', () => {
       ['Prism', 'Edge', 'Flux', 'Pulse', 'Volt', 'Nimbus', 'Citadel']
     );
   });
-
-  it('selects the first connected server as playback winner and marks subsequent servers available', () => {
-    const ordered = orderServersForParallelRace(BINGR_SERVERS, 2);
-    assert.equal(ordered[0].id, 'bingr-flux');
-    assert.equal(ordered.length, 7);
-
-    let winner: number | null = null;
-
-    // 1. Server 0 fails first -> no winner yet
-    const res0 = selectFirstConnectedWinner(winner, {
-      serverIndex: 0,
-      success: false,
-      link: null,
-    });
-    assert.equal(res0.shouldClaimPlayback, false);
-    assert.equal(res0.nextWinnerIndex, null);
-    assert.equal(res0.status, 'failed');
-    assert.equal(res0.state, 'FAILED');
-
-    // 2. Server 3 resolves first with a valid stream -> immediately claims playback!
-    const res3 = selectFirstConnectedWinner(winner, {
-      serverIndex: 3,
-      success: true,
-      link: '/api/stream/proxy?url=https%3A%2F%2Fvidly.pro%2Fmaster.m3u8',
-    });
-    winner = res3.nextWinnerIndex;
-    assert.equal(res3.shouldClaimPlayback, true);
-    assert.equal(winner, 3);
-    assert.equal(res3.status, 'connecting');
-    assert.equal(res3.state, 'SELECTED');
-
-    // 3. Server 1 resolves 50ms later -> marked available without interrupting Server 3
-    const res1 = selectFirstConnectedWinner(winner, {
-      serverIndex: 1,
-      success: true,
-      link: '/api/stream/proxy?url=https%3A%2F%2Fvidly.pro%2Fedge.m3u8',
-    });
-    assert.equal(res1.shouldClaimPlayback, false);
-    assert.equal(res1.nextWinnerIndex, 3);
-    assert.equal(res1.status, 'available');
-    assert.equal(res1.state, 'AVAILABLE');
-  });
-
-  it('builds and parses GOAT (All-In-One Omni) routes and aliases', () => {
-    assert.equal(
-      buildPlayerUrl({
-        baseOrigin: 'https://zxcstream-mirror.vercel.app',
-        playerMode: 'omni',
-        mediaType: 'movie',
-        tmdbId: '1381071',
-      }),
-      'https://zxcstream-mirror.vercel.app/goat/movie/1381071'
-    );
-    assert.equal(
-      buildPlayerUrl({
-        baseOrigin: 'https://zxcstream-mirror.vercel.app',
-        playerMode: 'omni',
-        mediaType: 'tv',
-        tmdbId: '1396',
-        season: '2',
-        episode: '5',
-      }),
-      'https://zxcstream-mirror.vercel.app/goat/tv/1396/2/5'
-    );
-
-    assert.deepEqual(parseAppRoute('/goat/movie/1381071'), {
-      page: 'player',
-      playerMode: 'omni',
-      mediaType: 'movie',
-      tmdbId: '1381071',
-      season: 1,
-      episode: 1,
-    });
-    assert.deepEqual(parseAppRoute('/omni/movie/1381071'), {
-      page: 'player',
-      playerMode: 'omni',
-      mediaType: 'movie',
-      tmdbId: '1381071',
-      season: 1,
-      episode: 1,
-    });
-    assert.deepEqual(parseAppRoute('/all/tv/1396/2/5'), {
-      page: 'player',
-      playerMode: 'omni',
-      mediaType: 'tv',
-      tmdbId: '1396',
-      season: 2,
-      episode: 5,
-    });
-    assert.deepEqual(parseAppRoute('/allinone/movie/27205'), {
-      page: 'player',
-      playerMode: 'omni',
-      mediaType: 'movie',
-      tmdbId: '27205',
-      season: 1,
-      episode: 1,
-    });
-  });
-
-  it('defines OMNI_SERVERS combining Bingr, Over Power, ZXCSTREAM, and NXSHA without duplicate IDs', () => {
-    const expectedCount =
-      BINGR_SERVERS.length +
-      OVERPOWER_SERVERS.filter((s) => s.id.startsWith('source-')).length +
-      PLAYER_SERVERS.length +
-      NXSHA_SERVERS.length;
-
-    assert.equal(OMNI_SERVERS.length, expectedCount);
-    assert.equal(OMNI_SERVERS.length, 63);
-
-    const ids = new Set<string>();
-    OMNI_SERVERS.forEach((srv, idx) => {
-      assert.equal(srv.index, idx);
-      assert.equal(ids.has(srv.id), false, `Duplicate server id: ${srv.id}`);
-      ids.add(srv.id);
-    });
-
-    assert.ok(OMNI_SERVERS.some((s) => s.engineTag === 'BINGR' && s.id === 'bingr-prism'));
-    assert.ok(OMNI_SERVERS.some((s) => s.engineTag === 'OVER POWER' && s.id === 'source-1'));
-    assert.ok(OMNI_SERVERS.some((s) => s.engineTag === 'ZXCSTREAM' && s.id === 'zxc-orion'));
-    assert.ok(OMNI_SERVERS.some((s) => s.engineTag === 'NXSHA' && s.id === 'nx-watchout'));
-    assert.ok(OMNI_SERVERS.some((s) => s.engineTag === 'NXSHA' && s.id === 'nx-apollo'));
-  });
 });
-

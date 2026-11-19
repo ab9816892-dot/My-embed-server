@@ -12,10 +12,8 @@ import {
   parsePlayerQueryParams,
 } from './utils/urlBuilder';
 import { HomePage } from './components/HomePage';
-import { DownloadPage } from './components/DownloadPage';
 import { CustomPlayerView } from './components/CustomPlayerView';
 import { AnimePlayer } from './anime/AnimePlayer';
-import { DeveloperDashboardPage } from './components/DeveloperDashboardPage';
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(() => parseAppRoute(window.location.pathname));
@@ -41,46 +39,6 @@ export default function App() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
-
-  if (route.page === 'developers') {
-    return (
-      <DeveloperDashboardPage
-        onNavigateHome={() => navigateTo('/')}
-        onNavigateDownload={(
-          mediaType: MediaType,
-          tmdbId: string,
-          season?: number,
-          episode?: number
-        ) => {
-          if (mediaType === 'tv' && season && episode) {
-            navigateTo(`/download/tv/${tmdbId}/${season}/${episode}`);
-          } else {
-            navigateTo(`/download/${mediaType}/${tmdbId}`);
-          }
-        }}
-      />
-    );
-  }
-
-  if (route.page === 'download') {
-    return (
-      <DownloadPage
-        mediaType={route.mediaType}
-        tmdbId={route.tmdbId}
-        initialSeason={route.season}
-        initialEpisode={route.episode}
-        onNavigateHome={() => navigateTo('/')}
-        onNavigateDevelopers={() => navigateTo('/developers')}
-        onSelectMedia={(newMediaType: MediaType, newTmdbId: string) =>
-          navigateTo(
-            newMediaType === 'tv'
-              ? `/download/tv/${newTmdbId}/1/1`
-              : `/download/movie/${newTmdbId}`
-          )
-        }
-      />
-    );
-  }
 
   if (route.page === 'anime') {
     return (
@@ -122,9 +80,7 @@ export default function App() {
         onBack={() => navigateTo('/')}
         onEpisodeChange={(newSeason, newEpisode) => {
           const endpoint =
-            route.playerMode === 'omni'
-              ? 'goat'
-              : route.playerMode === 'bingr'
+            route.playerMode === 'bingr'
               ? 'bingr'
               : route.playerMode === 'overpower'
               ? 'overpower'
@@ -143,10 +99,6 @@ export default function App() {
     <HomePage
       announcementOpen={announcementOpen}
       onDismissAnnouncement={() => setAnnouncementOpen(false)}
-      onNavigateDevelopers={() => navigateTo('/developers')}
-      onNavigateDownload={(mediaType: MediaType, tmdbId: string) =>
-        navigateTo(`/download/${mediaType}/${tmdbId}`)
-      }
       onOpenStandalonePlayer={(
         playerMode: PlayerMode,
         mediaType: MediaType,
@@ -163,9 +115,7 @@ export default function App() {
           return;
         }
         const endpoint =
-          playerMode === 'omni'
-            ? 'goat'
-            : playerMode === 'bingr'
+          playerMode === 'bingr'
             ? 'bingr'
             : playerMode === 'overpower'
             ? 'overpower'

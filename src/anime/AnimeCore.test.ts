@@ -186,7 +186,7 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
         season: '1',
         episode: '1',
       });
-      assert.equal(tvUrl, 'https://zxcstream-mirror.vercel.app/anime/tv/85937/1/1');
+      assert.equal(tvUrl, 'https://zxcstream-mirror.ai.studio/anime/tv/85937/1/1');
 
       // 2. Anime Movie URL
       const movieUrl = buildPlayerUrl({
@@ -194,7 +194,7 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
         mediaType: 'movie',
         tmdbId: '12',
       });
-      assert.equal(movieUrl, 'https://zxcstream-mirror.vercel.app/anime/movie/12');
+      assert.equal(movieUrl, 'https://zxcstream-mirror.ai.studio/anime/movie/12');
 
       // 3. Anime Movie URL with custom baseOrigin
       const customOriginMovie = buildPlayerUrl({
@@ -208,11 +208,11 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
 
     it('buildEmbedIframeCode produces iframe code with dedicated /anime/ namespace without /embed/', () => {
       const tvIframe = buildEmbedIframeCode('tv', '85937', '1', '1', undefined, 'anime');
-      assert.match(tvIframe, /<iframe src="https:\/\/zxcstream-mirror\.vercel\.app\/anime\/tv\/85937\/1\/1"/);
+      assert.match(tvIframe, /<iframe src="https:\/\/zxcstream-mirror\.ai\.studio\/anime\/tv\/85937\/1\/1"/);
       assert.equal(tvIframe.includes('/embed/'), false);
 
       const movieIframe = buildEmbedIframeCode('movie', '12', '1', '1', undefined, 'anime');
-      assert.match(movieIframe, /<iframe src="https:\/\/zxcstream-mirror\.vercel\.app\/anime\/movie\/12"/);
+      assert.match(movieIframe, /<iframe src="https:\/\/zxcstream-mirror\.ai\.studio\/anime\/movie\/12"/);
       assert.equal(movieIframe.includes('/embed/'), false);
     });
 
@@ -225,14 +225,14 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
         season: '1',
         episode: '1',
       });
-      assert.equal(zxTv, 'https://zxcstream-mirror.vercel.app/player/tv/85937/1/1');
+      assert.equal(zxTv, 'https://zxcstream-mirror.ai.studio/player/tv/85937/1/1');
 
       const zxMovie = buildPlayerUrl({
         playerMode: 'custom',
         mediaType: 'movie',
         tmdbId: '128',
       });
-      assert.equal(zxMovie, 'https://zxcstream-mirror.vercel.app/player/movie/128');
+      assert.equal(zxMovie, 'https://zxcstream-mirror.ai.studio/player/movie/128');
 
       // NXSHA -> /nxsha/
       const nxTv = buildPlayerUrl({
@@ -242,14 +242,14 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
         season: '1',
         episode: '1',
       });
-      assert.equal(nxTv, 'https://zxcstream-mirror.vercel.app/nxsha/tv/85937/1/1');
+      assert.equal(nxTv, 'https://zxcstream-mirror.ai.studio/nxsha/tv/85937/1/1');
 
       const nxMovie = buildPlayerUrl({
         playerMode: 'nxsha',
         mediaType: 'movie',
         tmdbId: '128',
       });
-      assert.equal(nxMovie, 'https://zxcstream-mirror.vercel.app/nxsha/movie/128');
+      assert.equal(nxMovie, 'https://zxcstream-mirror.ai.studio/nxsha/movie/128');
 
       // Anime Core -> /anime/
       const animeTv = buildPlayerUrl({
@@ -259,14 +259,14 @@ describe('ANIME CORE - Anime-Only TMDB Validation & Player Suite', () => {
         season: '1',
         episode: '1',
       });
-      assert.equal(animeTv, 'https://zxcstream-mirror.vercel.app/anime/tv/85937/1/1');
+      assert.equal(animeTv, 'https://zxcstream-mirror.ai.studio/anime/tv/85937/1/1');
 
       const animeMovie = buildPlayerUrl({
         playerMode: 'anime',
         mediaType: 'movie',
         tmdbId: '12',
       });
-      assert.equal(animeMovie, 'https://zxcstream-mirror.vercel.app/anime/movie/12');
+      assert.equal(animeMovie, 'https://zxcstream-mirror.ai.studio/anime/movie/12');
     });
 
     it('PRESERVES backward compatibility for legacy /embed/ routes', () => {

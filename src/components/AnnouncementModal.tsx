@@ -27,7 +27,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ open, onDi
           >
             <p>
               To avoid confusion, please only use and follow our active mirror at{' '}
-              <span className="font-semibold text-zinc-50">zxcstream-mirror.vercel.app</span>
+              <span className="font-semibold text-zinc-50">zxcstream-mirror.ai.studio</span>
             </p>
             <p>
               Our player and embed endpoints provide fast, ad-free streaming with full TMDB catalog support
@@ -35,7 +35,7 @@ export const AnnouncementModal: React.FC<AnnouncementModalProps> = ({ open, onDi
             </p>
             <div className="space-y-1 rounded-md bg-zinc-800/60 p-3 text-xs text-zinc-200">
               <p>
-                ✅ Official Mirror: <strong>zxcstream-mirror.vercel.app</strong>
+                ✅ Official Mirror: <strong>zxcstream-mirror.ai.studio</strong>
               </p>
               <p>✅ Embeddable without ads on your own websites</p>
               <p>✅ Supports full movie & TV series TMDB catalog</p>
